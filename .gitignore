@@ -1,0 +1,83 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+out/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Frontend
+frontend/dist/
+frontend/.angular/
+frontend/.sass-cache/
+frontend/*.tsbuildinfo
+
+# Backend
+backend/klopf-server
+backend/*.exe
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Nix
+result
+result-*
+.direnv/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Testing
+__snapshots__/
+*.snap
+
+# Misc
+*.bak
+*.tmp
+*.temp
+.cache/

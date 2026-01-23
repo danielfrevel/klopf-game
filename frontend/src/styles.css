@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@import "daisyui/daisyui.css";
+
+@theme {
+  --color-primary: #3b82f6;
+  --color-secondary: #8b5cf6;
+  --color-accent: #f59e0b;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Custom card styles */
+.card-face {
+  transition: transform 0.3s ease;
+}
+
+.card-face:hover {
+  transform: translateY(-4px);
+}
+
+/* Klopf animation */
+@keyframes klopf-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.klopf-active {
+  animation: klopf-pulse 0.5s ease-in-out infinite;
+}
