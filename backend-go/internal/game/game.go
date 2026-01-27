@@ -11,24 +11,28 @@ import (
 type GameState string
 
 const (
-	StateLobby         GameState = "lobby"
-	StateDealing       GameState = "dealing"
-	StatePlaying       GameState = "playing"
-	StateKlopfPending  GameState = "klopf_pending"
-	StateTrickComplete GameState = "trick_complete"
-	StateRoundEnd      GameState = "round_end"
-	StateGameOver      GameState = "game_over"
+	StateLobby          GameState = "lobby"
+	StateDealing        GameState = "dealing"
+	StatePlaying        GameState = "playing"
+	StateKlopfPending   GameState = "klopf_pending"
+	StateTrickComplete  GameState = "trick_complete"
+	StateRoundEnd       GameState = "round_end"
+	StateGameOver       GameState = "game_over"
+	StateRedealPending  GameState = "redeal_pending"
 )
 
 var (
-	ErrNotEnoughPlayers = errors.New("not enough players")
-	ErrTooManyPlayers   = errors.New("too many players")
-	ErrGameAlreadyStart = errors.New("game already started")
-	ErrWrongState       = errors.New("wrong game state")
-	ErrNotYourTurn      = errors.New("not your turn")
-	ErrCardNotInHand    = errors.New("card not in hand")
-	ErrMustFollowSuit   = errors.New("must follow suit if possible")
-	ErrPlayerNotFound   = errors.New("player not found")
+	ErrNotEnoughPlayers    = errors.New("not enough players")
+	ErrTooManyPlayers      = errors.New("too many players")
+	ErrGameAlreadyStart    = errors.New("game already started")
+	ErrWrongState          = errors.New("wrong game state")
+	ErrNotYourTurn         = errors.New("not your turn")
+	ErrCardNotInHand       = errors.New("card not in hand")
+	ErrMustFollowSuit      = errors.New("must follow suit if possible")
+	ErrPlayerNotFound      = errors.New("player not found")
+	ErrRedealLimitReached  = errors.New("redeal limit reached")
+	ErrRedealNotAllowed    = errors.New("redeal only allowed with 2 players")
+	ErrAlreadyRequestedRedeal = errors.New("already requested redeal")
 )
 
 const (
@@ -37,33 +41,42 @@ const (
 	MaxPlayers    = 4
 	CardsPerRound = 4
 	StartingLives = 7
+	MaxRedeals    = 3
 )
 
 type Game struct {
 	mu sync.RWMutex
 
-	State         GameState          `json:"state"`
-	Players       []*Player          `json:"players"`
-	CurrentPlayer int                `json:"currentPlayer"`
-	Deck          *Deck              `json:"-"`
-	CurrentTrick  *Trick             `json:"currentTrick"`
-	TrickNumber   int                `json:"trickNumber"`
-	Klopf         *KlopfState        `json:"klopf"`
-	RoundNumber   int                `json:"roundNumber"`
+	State         GameState              `json:"state"`
+	Players       []*Player              `json:"players"`
+	CurrentPlayer int                    `json:"currentPlayer"`
+	Deck          *Deck                  `json:"-"`
+	CurrentTrick  *Trick                 `json:"currentTrick"`
+	TrickNumber   int                    `json:"trickNumber"`
+	Klopf         *KlopfState            `json:"klopf"`
+	RoundNumber   int                    `json:"roundNumber"`
+	Stakes        int                    `json:"stakes"`
 	Timers        map[string]*time.Timer `json:"-"`
 
-	OnTimeout func(playerID string)    `json:"-"`
-	OnUpdate  func()                   `json:"-"`
+	// Redeal tracking (Einigung)
+	RedealCount     int               `json:"redealCount"`
+	RedealRequester string            `json:"-"`
+	RedealResponses map[string]bool   `json:"-"`
+
+	OnTimeout func(playerID string) `json:"-"`
+	OnUpdate  func()                `json:"-"`
 }
 
 func NewGame() *Game {
 	return &Game{
-		State:        StateLobby,
-		Players:      make([]*Player, 0, MaxPlayers),
-		Klopf:        NewKlopfState(),
-		Timers:       make(map[string]*time.Timer),
-		RoundNumber:  0,
-		TrickNumber:  0,
+		State:           StateLobby,
+		Players:         make([]*Player, 0, MaxPlayers),
+		Klopf:           NewKlopfState(),
+		Timers:          make(map[string]*time.Timer),
+		RoundNumber:     0,
+		TrickNumber:     0,
+		RedealCount:     0,
+		RedealResponses: make(map[string]bool),
 	}
 }
 
@@ -229,6 +242,16 @@ func (g *Game) InitiateKlopf(playerID string) error {
 
 	if g.State != StatePlaying && g.State != StateDealing {
 		return ErrWrongState
+	}
+
+	// Check klopf limit: new level cannot exceed player's lives + 1
+	player := g.getPlayerUnsafe(playerID)
+	if player == nil {
+		return ErrPlayerNotFound
+	}
+	newLevel := g.Klopf.Level + 1
+	if newLevel > player.Lives+1 {
+		return ErrKlopfLimitExceeded
 	}
 
 	if err := g.Klopf.Initiate(playerID); err != nil {
@@ -537,4 +560,152 @@ func (g *Game) GetWinner() *Player {
 		}
 	}
 	return nil
+}
+
+// SetStakes sets the stakes for the game (only in lobby state)
+func (g *Game) SetStakes(stakes int) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.State != StateLobby {
+		return ErrWrongState
+	}
+
+	if stakes < 0 {
+		stakes = 0
+	}
+
+	g.Stakes = stakes
+	return nil
+}
+
+// GetStakes returns the current stakes
+func (g *Game) GetStakes() int {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.Stakes
+}
+
+// RequestRedeal initiates a redeal request (Einigung)
+func (g *Game) RequestRedeal(playerID string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	// Only allowed in dealing state
+	if g.State != StateDealing {
+		return ErrWrongState
+	}
+
+	// Only allowed with exactly 2 alive players
+	aliveCount := g.countAlivePlayers()
+	if aliveCount != 2 {
+		return ErrRedealNotAllowed
+	}
+
+	// Check redeal limit
+	if g.RedealCount >= MaxRedeals {
+		return ErrRedealLimitReached
+	}
+
+	// Check if already requested
+	if g.RedealRequester == playerID {
+		return ErrAlreadyRequestedRedeal
+	}
+
+	g.RedealRequester = playerID
+	g.RedealResponses = make(map[string]bool)
+	g.State = StateRedealPending
+
+	return nil
+}
+
+// RespondToRedeal handles a player's response to a redeal request
+func (g *Game) RespondToRedeal(playerID string, agree bool) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.State != StateRedealPending {
+		return ErrWrongState
+	}
+
+	// The requester doesn't respond - they already agreed by requesting
+	if playerID == g.RedealRequester {
+		return nil
+	}
+
+	g.RedealResponses[playerID] = agree
+
+	// Check if the other player responded
+	if agree {
+		// Both players agree - perform redeal
+		g.RedealCount++
+		g.performRedeal()
+	} else {
+		// Other player declined - go back to dealing state
+		g.RedealRequester = ""
+		g.RedealResponses = make(map[string]bool)
+		g.State = StateDealing
+	}
+
+	return nil
+}
+
+// performRedeal redeals cards to all alive players
+func (g *Game) performRedeal() {
+	g.Klopf.Reset()
+
+	// Create and shuffle new deck
+	g.Deck = NewDeck()
+	g.Deck.Shuffle()
+
+	// Deal new cards to alive players
+	for _, p := range g.Players {
+		if p.IsAlive() {
+			p.Hand = g.Deck.Deal(CardsPerRound)
+			p.HasSeenCards = true
+			if p.Lives == 1 {
+				p.MustMitgehen = true
+				g.Klopf.Initiate(p.ID)
+			} else {
+				p.MustMitgehen = false
+			}
+		}
+	}
+
+	g.CurrentTrick = NewTrick()
+	g.RedealRequester = ""
+	g.RedealResponses = make(map[string]bool)
+	g.State = StateDealing
+
+	// If there's an auto-klopf, go to klopf pending
+	if g.Klopf.Active {
+		g.State = StateKlopfPending
+	}
+}
+
+// CanRequestRedeal checks if a player can request a redeal
+func (g *Game) CanRequestRedeal(playerID string) bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	if g.State != StateDealing {
+		return false
+	}
+
+	if g.countAlivePlayers() != 2 {
+		return false
+	}
+
+	if g.RedealCount >= MaxRedeals {
+		return false
+	}
+
+	return true
+}
+
+// GetRedealInfo returns info about the current redeal state
+func (g *Game) GetRedealInfo() (requester string, count int, maxRedeals int) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.RedealRequester, g.RedealCount, MaxRedeals
 }

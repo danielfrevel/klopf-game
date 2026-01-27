@@ -1,0 +1,71 @@
+import { Type, type Static } from '@sinclair/typebox';
+
+// Suit schema and type
+export const SuitSchema = Type.Union([
+  Type.Literal('spades'),
+  Type.Literal('hearts'),
+  Type.Literal('diamonds'),
+  Type.Literal('clubs'),
+]);
+export type Suit = Static<typeof SuitSchema>;
+
+// Rank schema and type
+export const RankSchema = Type.Union([
+  Type.Literal('7'),
+  Type.Literal('8'),
+  Type.Literal('9'),
+  Type.Literal('10'),
+  Type.Literal('J'),
+  Type.Literal('Q'),
+  Type.Literal('K'),
+  Type.Literal('A'),
+]);
+export type Rank = Static<typeof RankSchema>;
+
+// Card schema and type
+export const CardSchema = Type.Object({
+  id: Type.String(),
+  suit: SuitSchema,
+  rank: RankSchema,
+});
+export type Card = Static<typeof CardSchema>;
+
+// Suit symbols for display
+export const SUIT_SYMBOLS: Record<Suit, string> = {
+  spades: '♠',
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
+};
+
+// Suit colors for display (Tailwind classes)
+export const SUIT_COLORS: Record<Suit, string> = {
+  spades: 'text-gray-900',
+  hearts: 'text-red-600',
+  diamonds: 'text-red-600',
+  clubs: 'text-gray-900',
+};
+
+// Get card display string (e.g., "7♠")
+export function getCardDisplay(card: Card): string {
+  return `${card.rank}${SUIT_SYMBOLS[card.suit]}`;
+}
+
+// All suits in order
+export const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs'];
+
+// All ranks in order (game order: 10 is highest)
+export const RANKS: Rank[] = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+// Rank values for comparison (higher = better)
+// In Klopf: 10 > 9 > 8 > 7 > J > Q > K > A
+export const RANK_VALUES: Record<Rank, number> = {
+  'A': 1,
+  'K': 2,
+  'Q': 3,
+  'J': 4,
+  '7': 5,
+  '8': 6,
+  '9': 7,
+  '10': 8,
+};

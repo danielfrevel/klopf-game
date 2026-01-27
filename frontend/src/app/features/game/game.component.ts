@@ -80,17 +80,25 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           }
         </div>
 
-        <!-- Klopf Button -->
-        @if (canKlopf()) {
-          <div class="flex justify-center">
+        <!-- Action Buttons -->
+        <div class="flex justify-center gap-4">
+          @if (canKlopf()) {
             <button class="btn btn-warning btn-lg" (click)="klopf()">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               Klopfen!
             </button>
-          </div>
-        }
+          }
+          @if (canRequestRedeal()) {
+            <button class="btn btn-secondary btn-lg" (click)="requestRedeal()">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Einigung ({{ getRedealInfo() }})
+            </button>
+          }
+        </div>
 
         <!-- My Hand -->
         <div class="bg-base-100 rounded-xl shadow-lg p-4">
@@ -128,6 +136,27 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
         />
       }
 
+      <!-- Redeal Dialog -->
+      @if (gameState.redealResponseNeeded()) {
+        <div class="modal modal-open">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Einigung?</h3>
+            <p class="mb-4">
+              <span class="font-bold">{{ gameState.redealRequesterName() }}</span>
+              möchte neue Karten austeilen.
+            </p>
+            <p class="text-sm text-base-content/70 mb-4">
+              Bereits {{ gameState.gameState()?.redealCount || 0 }} von {{ gameState.gameState()?.maxRedeals || 3 }} Neuverteilungen verwendet.
+            </p>
+            <div class="modal-action">
+              <button class="btn btn-error" (click)="respondToRedeal(false)">Ablehnen</button>
+              <button class="btn btn-success" (click)="respondToRedeal(true)">Zustimmen</button>
+            </div>
+          </div>
+          <div class="modal-backdrop bg-black/50"></div>
+        </div>
+      }
+
       <!-- Round Results -->
       @if (gameState.roundResults()) {
         <div class="modal modal-open">
@@ -160,9 +189,29 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
         <div class="modal modal-open">
           <div class="modal-box text-center">
             <h3 class="font-bold text-2xl mb-4">Spiel beendet!</h3>
+            @if (gameState.perfectWin()) {
+              <div class="mb-4">
+                <span class="text-4xl">🏆</span>
+                <p class="text-lg text-warning font-bold">Perfekter Sieg!</p>
+              </div>
+            }
             <p class="text-lg mb-4">
               <span class="font-bold text-primary">{{ getWinnerName() }}</span> gewinnt!
             </p>
+            @if (gameState.perfectWin()) {
+              <p class="text-sm text-base-content/70 mb-4">
+                Ohne ein einziges Leben zu verlieren!
+              </p>
+            }
+            @if (gameState.winnings() > 0) {
+              <div class="bg-success/20 rounded-lg p-4 mb-4">
+                <p class="text-sm text-base-content/70">Gewinn</p>
+                <p class="text-2xl font-bold text-success">{{ gameState.winnings() }}€</p>
+                @if (gameState.perfectWin()) {
+                  <p class="text-xs text-base-content/50">(Verdoppelt durch perfekten Sieg!)</p>
+                }
+              </div>
+            }
             <div class="modal-action justify-center">
               <button class="btn btn-primary" (click)="backToLobby()">Zur Lobby</button>
             </div>
@@ -214,14 +263,23 @@ export class GameComponent implements OnInit {
     const state = this.gameState.gameState();
     const klopf = state?.klopf;
     const myId = this.gameState.playerId();
+    const me = this.gameState.me();
 
-    // Can klopf if game is in playing state and either:
+    if (!me || state?.state !== 'playing') {
+      return false;
+    }
+
+    // Check klopf limit: new level cannot exceed player's lives + 1
+    const currentLevel = klopf?.level || 0;
+    const newLevel = currentLevel + 1;
+    if (newLevel > me.lives + 1) {
+      return false;
+    }
+
+    // Can klopf if:
     // - No active klopf
     // - Counter-klopf (last klopper is not me)
-    return (
-      state?.state === 'playing' &&
-      (!klopf?.active || klopf.initiator !== myId)
-    );
+    return !klopf?.active || klopf.initiator !== myId;
   }
 
   klopf(): void {
@@ -230,6 +288,40 @@ export class GameComponent implements OnInit {
 
   respondToKlopf(mitgehen: boolean): void {
     this.ws.respondToKlopf(mitgehen);
+  }
+
+  canRequestRedeal(): boolean {
+    const state = this.gameState.gameState();
+    if (!state || state.state !== 'dealing') {
+      return false;
+    }
+
+    // Only allowed with exactly 2 alive players
+    const alivePlayers = state.players.filter(p => p.lives > 0);
+    if (alivePlayers.length !== 2) {
+      return false;
+    }
+
+    // Check redeal limit
+    if (state.redealCount >= state.maxRedeals) {
+      return false;
+    }
+
+    return true;
+  }
+
+  requestRedeal(): void {
+    this.ws.requestRedeal();
+  }
+
+  respondToRedeal(agree: boolean): void {
+    this.ws.respondToRedeal(agree);
+  }
+
+  getRedealInfo(): string {
+    const state = this.gameState.gameState();
+    const remaining = (state?.maxRedeals || 3) - (state?.redealCount || 0);
+    return `${remaining} übrig`;
   }
 
   getKlopfInitiatorName(): string {

@@ -82,7 +82,7 @@ import { WebsocketService, GameStateService } from '../../core/services';
               @for (player of gameState.gameState()?.players; track player.id) {
                 <li class="flex items-center gap-2 p-2 rounded bg-base-200">
                   <div class="avatar placeholder">
-                    <div class="bg-primary text-primary-content rounded-full w-8">
+                    <div class="bg-primary text-primary-content rounded-full w-8 h-8 flex items-center justify-center">
                       <span class="text-sm">{{ player.name.charAt(0).toUpperCase() }}</span>
                     </div>
                   </div>
@@ -103,6 +103,28 @@ import { WebsocketService, GameStateService } from '../../core/services';
             </p>
 
             @if (gameState.isOwner()) {
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text">Einsatz (optional)</span>
+                </label>
+                <div class="input-group">
+                  <input
+                    type="number"
+                    class="input input-bordered w-full"
+                    [(ngModel)]="stakes"
+                    (change)="updateStakes()"
+                    placeholder="0"
+                    min="0"
+                  />
+                  <span class="bg-base-200 px-4 flex items-center">€</span>
+                </div>
+                <label class="label">
+                  <span class="label-text-alt text-base-content/50">
+                    Gewinn: {{ (gameState.gameState()?.players?.length || 1) - 1 }} × {{ stakes || 0 }}€ = {{ ((gameState.gameState()?.players?.length || 1) - 1) * (stakes || 0) }}€
+                  </span>
+                </label>
+              </div>
+
               <button
                 class="btn btn-primary w-full"
                 [disabled]="(gameState.gameState()?.players?.length || 0) < 2"
@@ -117,6 +139,12 @@ import { WebsocketService, GameStateService } from '../../core/services';
                 Raum schließen
               </button>
             } @else {
+              @if ((gameState.gameState()?.stakes || 0) > 0) {
+                <div class="text-center mb-4 p-3 bg-base-200 rounded-lg">
+                  <p class="text-sm text-base-content/70">Einsatz</p>
+                  <p class="text-xl font-bold">{{ gameState.gameState()?.stakes }}€</p>
+                </div>
+              }
               <p class="text-center text-base-content/70">
                 Warte auf Host...
               </p>
@@ -136,6 +164,7 @@ import { WebsocketService, GameStateService } from '../../core/services';
 export class LobbyComponent implements OnInit {
   playerName = '';
   roomCode = '';
+  stakes = 0;
   copied = signal(false);
 
   constructor(
@@ -173,6 +202,13 @@ export class LobbyComponent implements OnInit {
 
   closeRoom(): void {
     this.ws.closeRoom();
+  }
+
+  updateStakes(): void {
+    if (this.stakes < 0) {
+      this.stakes = 0;
+    }
+    this.ws.setStakes(this.stakes);
   }
 
   copyRoomCode(): void {

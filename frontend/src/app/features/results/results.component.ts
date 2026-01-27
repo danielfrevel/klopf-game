@@ -15,12 +15,30 @@ import { GameStateService } from '../../core/services';
 
           @if (getWinner()) {
             <div class="mb-6">
+              @if (gameState.perfectWin()) {
+                <div class="mb-2">
+                  <span class="text-5xl">🏆</span>
+                </div>
+              }
               <div class="avatar placeholder mb-4">
                 <div class="bg-primary text-primary-content rounded-full w-20">
                   <span class="text-3xl">{{ getWinner()!.name.charAt(0).toUpperCase() }}</span>
                 </div>
               </div>
               <h2 class="text-2xl font-bold">{{ getWinner()!.name }} gewinnt!</h2>
+              @if (gameState.perfectWin()) {
+                <p class="text-warning font-bold mt-2">Perfekter Sieg!</p>
+                <p class="text-sm text-base-content/70">Ohne ein einziges Leben zu verlieren!</p>
+              }
+              @if (gameState.winnings() > 0) {
+                <div class="bg-success/20 rounded-lg p-4 mt-4">
+                  <p class="text-sm text-base-content/70">Gewinn</p>
+                  <p class="text-2xl font-bold text-success">{{ gameState.winnings() }}€</p>
+                  @if (gameState.perfectWin()) {
+                    <p class="text-xs text-base-content/50">(Verdoppelt durch perfekten Sieg!)</p>
+                  }
+                </div>
+              }
             </div>
           }
 

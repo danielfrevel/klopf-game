@@ -16,8 +16,12 @@ export class GameStateService {
   private _myCards = signal<Card[]>([]);
   private _lastPlayedCard = signal<{ playerId: string; card: Card } | null>(null);
   private _klopfResponseNeeded = signal<boolean>(false);
+  private _redealResponseNeeded = signal<boolean>(false);
+  private _redealRequesterName = signal<string | null>(null);
   private _roundResults = signal<RoundResult[] | null>(null);
   private _winnerId = signal<string | null>(null);
+  private _perfectWin = signal<boolean>(false);
+  private _winnings = signal<number>(0);
   private _error = signal<string | null>(null);
 
   // Public readonly signals
@@ -27,8 +31,12 @@ export class GameStateService {
   readonly myCards = this._myCards.asReadonly();
   readonly lastPlayedCard = this._lastPlayedCard.asReadonly();
   readonly klopfResponseNeeded = this._klopfResponseNeeded.asReadonly();
+  readonly redealResponseNeeded = this._redealResponseNeeded.asReadonly();
+  readonly redealRequesterName = this._redealRequesterName.asReadonly();
   readonly roundResults = this._roundResults.asReadonly();
   readonly winnerId = this._winnerId.asReadonly();
+  readonly perfectWin = this._perfectWin.asReadonly();
+  readonly winnings = this._winnings.asReadonly();
   readonly error = this._error.asReadonly();
 
   // Computed values
@@ -76,17 +84,21 @@ export class GameStateService {
         this.logger.info('GameState', 'Room joined', { roomCode: msg.roomCode, playerId: msg.playerId });
         break;
 
-      case 'game_state':
-        if (msg.state) {
-          const prevState = this._gameState()?.state;
-          this._gameState.set(msg.state);
-          this.logger.info('GameState', 'State updated', {
-            state: msg.state.state,
-            prevState,
-            currentPlayerId: msg.state.currentPlayerId,
-            trickCards: msg.state.currentTrick?.cards?.length || 0
-          });
-        }
+      case 'game_state': {
+        const prevState = this._gameState()?.state;
+        this._gameState.set(msg.state);
+        this.logger.info('GameState', 'State updated', {
+          state: msg.state.state,
+          prevState,
+          currentPlayerId: msg.state.currentPlayerId,
+          trickCards: msg.state.currentTrick?.cards?.length || 0
+        });
+        break;
+      }
+
+      case 'game_started':
+        this.logger.info('GameState', 'Game started');
+        // Game state update will follow in a separate message
         break;
 
       case 'cards_dealt':
@@ -124,6 +136,28 @@ export class GameStateService {
         this.logger.info('GameState', 'Klopf resolved');
         break;
 
+      case 'redeal_requested':
+        this.logger.info('GameState', 'Redeal requested', { playerId: msg.playerId });
+        break;
+
+      case 'redeal_response_needed':
+        this._redealResponseNeeded.set(true);
+        // Note: requester name should be fetched from game state
+        this.logger.info('GameState', 'Redeal response needed', { redealCount: msg.redealCount, maxRedeals: msg.maxRedeals });
+        break;
+
+      case 'redeal_performed':
+        this._redealResponseNeeded.set(false);
+        this._redealRequesterName.set(null);
+        this.logger.info('GameState', 'Redeal performed', { count: msg.redealCount });
+        break;
+
+      case 'redeal_declined':
+        this._redealResponseNeeded.set(false);
+        this._redealRequesterName.set(null);
+        this.logger.info('GameState', 'Redeal declined');
+        break;
+
       case 'round_ended':
         if (msg.results) {
           this._roundResults.set(msg.results);
@@ -134,7 +168,9 @@ export class GameStateService {
       case 'game_over':
         if (msg.winnerId) {
           this._winnerId.set(msg.winnerId);
-          this.logger.info('GameState', 'Game over', { winnerId: msg.winnerId });
+          this._perfectWin.set(msg.perfectWin || false);
+          this._winnings.set(msg.winnings || 0);
+          this.logger.info('GameState', 'Game over', { winnerId: msg.winnerId, perfectWin: msg.perfectWin, winnings: msg.winnings });
         }
         break;
 
@@ -145,8 +181,12 @@ export class GameStateService {
         break;
 
       case 'player_joined':
+        this.logger.info('GameState', 'Player joined', { player: msg.player });
+        // Game state update will follow
+        break;
+
       case 'player_left':
-        this.logger.info('GameState', `Player ${msg.type.split('_')[1]}`, { playerId: msg.playerId });
+        this.logger.info('GameState', 'Player left', { playerId: msg.playerId });
         // Game state update will follow
         break;
 
@@ -168,6 +208,10 @@ export class GameStateService {
     this._gameState.set(null);
     this._myCards.set([]);
     this._winnerId.set(null);
+    this._perfectWin.set(false);
+    this._winnings.set(0);
     this._roundResults.set(null);
+    this._redealResponseNeeded.set(false);
+    this._redealRequesterName.set(null);
   }
 }

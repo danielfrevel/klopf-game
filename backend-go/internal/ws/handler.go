@@ -88,6 +88,12 @@ func (h *Handler) handleMessage(conn *websocket.Conn, message []byte) {
 		h.handleKlopfResponse(conn, msg)
 	case MsgBlindDrei:
 		h.handleBlindDrei(conn)
+	case MsgSetStakes:
+		h.handleSetStakes(conn, msg)
+	case MsgRequestRedeal:
+		h.handleRequestRedeal(conn)
+	case MsgRedealResponse:
+		h.handleRedealResponse(conn, msg)
 	default:
 		log.Printf("[WS] Unknown message type: %s", msg.Type)
 		h.sendError(conn, "Unknown message type")
@@ -111,6 +117,12 @@ func (h *Handler) handleCreateRoom(conn *websocket.Conn, msg ClientMessage) {
 		Type:     MsgRoomCreated,
 		RoomCode: rm.Code,
 		PlayerID: playerID,
+	})
+
+	// Send initial game state to host
+	h.send(conn, ServerMessage{
+		Type:  MsgGameState,
+		State: NewGameStateInfo(rm.Game),
 	})
 }
 
@@ -145,11 +157,8 @@ func (h *Handler) handleJoinRoom(conn *websocket.Conn, msg ClientMessage) {
 		Player: NewPlayerInfo(player),
 	})
 
-	// Send current game state to new player
-	h.send(conn, ServerMessage{
-		Type:  MsgGameState,
-		State: NewGameStateInfo(rm.Game),
-	})
+	// Send current game state to all players
+	h.broadcastGameState(rm)
 }
 
 func (h *Handler) handleReconnect(conn *websocket.Conn, msg ClientMessage) {
@@ -356,9 +365,23 @@ func (h *Handler) handlePlayCard(conn *websocket.Conn, msg ClientMessage) {
 		log.Printf("[PlayCard] Game over")
 		winner := rm.Game.GetWinner()
 		if winner != nil {
+			// Check for perfect victory (winner still has all 7 lives)
+			perfectWin := winner.Lives == game.StartingLives
+			stakes := rm.Game.GetStakes()
+			playerCount := len(rm.Game.Players)
+
+			// Calculate winnings: (players - 1) * stakes, doubled for perfect win
+			winnings := (playerCount - 1) * stakes
+			if perfectWin {
+				winnings *= 2
+			}
+
 			h.broadcastToRoom(roomCode, ServerMessage{
-				Type:     MsgGameOver,
-				WinnerID: winner.ID,
+				Type:       MsgGameOver,
+				WinnerID:   winner.ID,
+				PerfectWin: perfectWin,
+				Stakes:     stakes,
+				Winnings:   winnings,
 			})
 		}
 		return
@@ -454,6 +477,127 @@ func (h *Handler) handleBlindDrei(conn *websocket.Conn) {
 			})
 		}
 	}
+}
+
+func (h *Handler) handleSetStakes(conn *websocket.Conn, msg ClientMessage) {
+	playerID := h.getPlayerID(conn)
+	roomCode := h.getPlayerRoom(playerID)
+
+	rm := h.roomManager.GetRoom(roomCode)
+	if rm == nil {
+		h.sendError(conn, "Room not found")
+		return
+	}
+
+	if !rm.IsOwner(playerID) {
+		h.sendError(conn, "Only room owner can set stakes")
+		return
+	}
+
+	if err := rm.Game.SetStakes(msg.Stakes); err != nil {
+		h.sendError(conn, err.Error())
+		return
+	}
+
+	// Broadcast updated game state to all players
+	h.broadcastGameState(rm)
+}
+
+func (h *Handler) handleRequestRedeal(conn *websocket.Conn) {
+	playerID := h.getPlayerID(conn)
+	roomCode := h.getPlayerRoom(playerID)
+
+	rm := h.roomManager.GetRoom(roomCode)
+	if rm == nil {
+		h.sendError(conn, "Room not found")
+		return
+	}
+
+	if err := rm.Game.RequestRedeal(playerID); err != nil {
+		h.sendError(conn, err.Error())
+		return
+	}
+
+	requester, redealCount, maxRedeals := rm.Game.GetRedealInfo()
+	player := rm.GetPlayer(playerID)
+	playerName := ""
+	if player != nil {
+		playerName = player.Name
+	}
+
+	// Notify all players about the redeal request
+	h.broadcastToRoom(roomCode, ServerMessage{
+		Type:        MsgRedealRequested,
+		PlayerID:    requester,
+		RedealCount: redealCount,
+		MaxRedeals:  maxRedeals,
+	})
+
+	// Request response from the other player
+	for _, p := range rm.Game.Players {
+		if p.ID != playerID && p.IsAlive() && p.Conn != nil {
+			h.send(p.Conn, ServerMessage{
+				Type:        MsgRedealResponseNeeded,
+				PlayerID:    playerID,
+				RedealCount: redealCount,
+				MaxRedeals:  maxRedeals,
+				Error:       playerName, // Use Error field to pass requester name
+			})
+		}
+	}
+}
+
+func (h *Handler) handleRedealResponse(conn *websocket.Conn, msg ClientMessage) {
+	playerID := h.getPlayerID(conn)
+	roomCode := h.getPlayerRoom(playerID)
+
+	rm := h.roomManager.GetRoom(roomCode)
+	if rm == nil {
+		h.sendError(conn, "Room not found")
+		return
+	}
+
+	if err := rm.Game.RespondToRedeal(playerID, msg.Agree); err != nil {
+		h.sendError(conn, err.Error())
+		return
+	}
+
+	if msg.Agree {
+		// Redeal was performed - send new cards to players
+		_, redealCount, maxRedeals := rm.Game.GetRedealInfo()
+
+		h.broadcastToRoom(roomCode, ServerMessage{
+			Type:        MsgRedealPerformed,
+			RedealCount: redealCount,
+			MaxRedeals:  maxRedeals,
+		})
+
+		// Send new cards to each alive player
+		for _, p := range rm.Game.Players {
+			if p.Conn != nil && p.IsAlive() {
+				h.send(p.Conn, ServerMessage{
+					Type:  MsgCardsDealt,
+					Cards: p.Hand,
+				})
+			}
+		}
+
+		// If there's a klopf pending (1-life auto-klopf), notify
+		if rm.Game.Klopf.Active {
+			h.broadcastToRoom(roomCode, ServerMessage{
+				Type:     MsgKlopfInitiated,
+				PlayerID: rm.Game.Klopf.Initiator,
+				Level:    rm.Game.Klopf.Level,
+			})
+		}
+	} else {
+		// Redeal was declined
+		h.broadcastToRoom(roomCode, ServerMessage{
+			Type: MsgRedealDeclined,
+		})
+	}
+
+	h.broadcastGameState(rm)
 }
 
 func (h *Handler) handleRoundEnd(rm *room.Room) {

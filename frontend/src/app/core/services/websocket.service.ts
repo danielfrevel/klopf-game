@@ -1,42 +1,10 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
-import { Card, GameStateInfo, Player, RoundResult } from '../models';
+import type { ClientMessage, ServerMessage } from '@klopf/shared';
 import { LoggerService } from './logger.service';
 
-export type MessageType =
-  | 'create_room'
-  | 'join_room'
-  | 'reconnect'
-  | 'start_game'
-  | 'close_room'
-  | 'play_card'
-  | 'klopf'
-  | 'klopf_response'
-  | 'blind_drei';
-
-export interface ClientMessage {
-  type: MessageType;
-  playerName?: string;
-  roomCode?: string;
-  playerId?: string;
-  cardId?: string;
-  mitgehen?: boolean;
-}
-
-export interface ServerMessage {
-  type: string;
-  roomCode?: string;
-  playerId?: string;
-  player?: Player;
-  state?: GameStateInfo;
-  cards?: Card[];
-  card?: Card;
-  level?: number;
-  winnerId?: string;
-  results?: RoundResult[];
-  error?: string;
-  timeLeft?: number;
-}
+// Re-export types for convenience
+export type { ClientMessage, ServerMessage } from '@klopf/shared';
 
 @Injectable({
   providedIn: 'root'
@@ -150,9 +118,21 @@ export class WebsocketService implements OnDestroy {
     this.send({ type: 'blind_drei' });
   }
 
+  setStakes(stakes: number): void {
+    this.send({ type: 'set_stakes', stakes });
+  }
+
+  requestRedeal(): void {
+    this.send({ type: 'request_redeal' });
+  }
+
+  respondToRedeal(agree: boolean): void {
+    this.send({ type: 'redeal_response', agree });
+  }
+
   private handleMessage(message: ServerMessage): void {
     // Store session info for reconnect
-    if (message.type === 'room_created' && message.roomCode && message.playerId) {
+    if (message.type === 'room_created') {
       sessionStorage.setItem('klopf_room', message.roomCode);
       sessionStorage.setItem('klopf_player', message.playerId);
     }

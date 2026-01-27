@@ -3,11 +3,12 @@ package game
 import "errors"
 
 var (
-	ErrCannotKlopfTwice   = errors.New("cannot klopf twice in a row")
-	ErrKlopfAlreadyActive = errors.New("klopf is already active")
-	ErrMustMitgehen       = errors.New("player must mitgehen (1 life)")
-	ErrAlreadyResponded   = errors.New("player has already responded")
-	ErrNotInKlopf         = errors.New("no active klopf")
+	ErrCannotKlopfTwice    = errors.New("cannot klopf twice in a row")
+	ErrKlopfAlreadyActive  = errors.New("klopf is already active")
+	ErrMustMitgehen        = errors.New("player must mitgehen (1 life)")
+	ErrAlreadyResponded    = errors.New("player has already responded")
+	ErrNotInKlopf          = errors.New("no active klopf")
+	ErrKlopfLimitExceeded  = errors.New("klopf level would exceed lives + 1")
 )
 
 // KlopfState tracks the current klopf status

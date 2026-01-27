@@ -1,7 +1,2 @@
-export interface Player {
-  id: string;
-  name: string;
-  lives: number;
-  cardCount: number;
-  connected: boolean;
-}
+// Re-export player types from shared package
+export type { Player } from '@klopf/shared';
