@@ -127,8 +127,8 @@ func main() {
 	})
 
 	log.Println("Klopf Game Server starting on :8080")
-	log.Println("WebSocket endpoint: ws://localhost:8080/ws")
-	log.Println("Frontend log endpoint: http://localhost:8080/api/logs")
+	log.Println("WebSocket endpoint: ws://localhost:5551/ws")
+	log.Println("Frontend log endpoint: http://localhost:5551/api/logs")
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("Server error:", err)
