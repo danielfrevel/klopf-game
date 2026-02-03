@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { wsHandler } from './ws/handler.js';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8080;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5551;
 
 const app = new Elysia()
   // CORS for API endpoints

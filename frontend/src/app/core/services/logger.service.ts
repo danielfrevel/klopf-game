@@ -28,7 +28,7 @@ export class LoggerService {
   private enableConsole = true;
   private enableFileLogging = true;
   private flushInterval: ReturnType<typeof setInterval> | null = null;
-  private readonly LOG_ENDPOINT = 'http://localhost:8080/api/logs';
+  private readonly LOG_ENDPOINT = 'http://localhost:5551/api/logs';
 
   private levelColors: Record<LogLevel, string> = {
     debug: '#888',

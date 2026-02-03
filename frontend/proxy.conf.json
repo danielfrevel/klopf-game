@@ -1,6 +1,6 @@
 {
   "/ws": {
-    "target": "http://localhost:8080",
+    "target": "http://localhost:5551",
     "secure": false,
     "ws": true
   }
