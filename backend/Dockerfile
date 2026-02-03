@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/ ./packages/
 COPY backend/package.json ./backend/
-RUN npm i -g pnpm && pnpm install --frozen-lockfile
+RUN bun install
 COPY backend/ ./backend/
 
 FROM oven/bun:1-slim
