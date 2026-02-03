@@ -12,7 +12,7 @@ export type { ClientMessage, ServerMessage } from '@klopf/shared';
 export class WebsocketService implements OnDestroy {
   private logger = inject(LoggerService);
   private socket: WebSocket | null = null;
-  private readonly WS_URL = 'ws://localhost:5551/ws';
+  private readonly WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
   private connectionStatus$ = new BehaviorSubject<boolean>(false);
   private messages$ = new Subject<ServerMessage>();
