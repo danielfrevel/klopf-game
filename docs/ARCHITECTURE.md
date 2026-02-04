@@ -42,6 +42,7 @@ The Klopf game is a real-time multiplayer card game. The architecture consists o
 **What it is**: A fast JavaScript runtime (like Node.js but faster).
 
 **Why we use it**:
+
 - Native TypeScript support (no compilation step needed)
 - Built-in test runner
 - Fast startup and execution
@@ -61,6 +62,7 @@ bun test                 # Run tests
 **What it is**: A package manager like npm, but faster and more efficient.
 
 **Why we use it**:
+
 - **Workspaces**: Manages multiple packages in one repo (monorepo)
 - **Disk efficient**: Packages are stored once globally and symlinked
 - **Strict**: Prevents accessing undeclared dependencies
@@ -70,9 +72,9 @@ bun test                 # Run tests
 ```yaml
 # pnpm-workspace.yaml - defines which folders are packages
 packages:
-  - 'packages/*'  # packages/shared
-  - 'backend'
-  - 'frontend'
+    - "packages/*" # packages/shared
+    - "backend"
+    - "frontend"
 ```
 
 ```bash
@@ -83,11 +85,12 @@ pnpm -r run build         # Run 'build' in all packages
 ```
 
 **Workspace dependencies**: Using `workspace:*` in package.json:
+
 ```json
 {
-  "dependencies": {
-    "@klopf/shared": "workspace:*"  // Uses local package, not npm
-  }
+    "dependencies": {
+        "@klopf/shared": "workspace:*" // Uses local package, not npm
+    }
 }
 ```
 
@@ -96,12 +99,14 @@ pnpm -r run build         # Run 'build' in all packages
 **What it is**: A TypeScript web framework designed for Bun.
 
 **Why we use it**:
+
 - **Type inference**: Automatically infers types from route definitions
 - **Native WebSocket support**: First-class WS handling
 - **Validation**: TypeBox schemas validate at runtime AND provide TS types
 - **Performance**: Extremely fast (optimized for Bun)
 
 **Basic example**:
+
 ```typescript
 import { Elysia } from 'elysia';
 
@@ -116,22 +121,23 @@ const app = new Elysia()
 **What it is**: A JSON Schema builder that also provides TypeScript types.
 
 **Why we use it**: Write once, get both:
+
 1. Runtime validation schema
 2. TypeScript type
 
 ```typescript
-import { Type, Static } from '@sinclair/typebox';
+import { Type, Static } from "@sinclair/typebox";
 
 // Define schema (used for validation)
 const CardSchema = Type.Object({
-  id: Type.String(),
-  suit: Type.Union([
-    Type.Literal('spades'),
-    Type.Literal('hearts'),
-    Type.Literal('diamonds'),
-    Type.Literal('clubs'),
-  ]),
-  rank: Type.String(),
+    id: Type.String(),
+    suit: Type.Union([
+        Type.Literal("spades"),
+        Type.Literal("hearts"),
+        Type.Literal("diamonds"),
+        Type.Literal("clubs"),
+    ]),
+    rank: Type.String(),
 });
 
 // Extract TypeScript type from schema
@@ -194,54 +200,53 @@ Client ──────────────────────► Ser
 
 ```typescript
 // Create connection
-const socket = new WebSocket('ws://localhost:8080/ws');
+const socket = new WebSocket("ws://localhost:5551/ws");
 
 // Connection opened
 socket.onopen = () => {
-  console.log('Connected!');
-  socket.send(JSON.stringify({ type: 'create_room', playerName: 'Dan' }));
+    console.log("Connected!");
+    socket.send(JSON.stringify({ type: "create_room", playerName: "Dan" }));
 };
 
 // Receive messages
 socket.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  console.log('Received:', message);
+    const message = JSON.parse(event.data);
+    console.log("Received:", message);
 };
 
 // Connection closed
 socket.onclose = (event) => {
-  console.log('Disconnected:', event.code, event.reason);
+    console.log("Disconnected:", event.code, event.reason);
 };
 
 // Error handling
 socket.onerror = (error) => {
-  console.error('WebSocket error:', error);
+    console.error("WebSocket error:", error);
 };
 ```
 
 ### WebSocket in Elysia (Server)
 
 ```typescript
-import { Elysia } from 'elysia';
+import { Elysia } from "elysia";
 
-const app = new Elysia()
-  .ws('/ws', {
+const app = new Elysia().ws("/ws", {
     // Called when client connects
     open(ws) {
-      console.log('Client connected');
+        console.log("Client connected");
     },
 
     // Called when client sends a message
     message(ws, message) {
-      console.log('Received:', message);
-      ws.send({ type: 'response', data: 'Hello!' });
+        console.log("Received:", message);
+        ws.send({ type: "response", data: "Hello!" });
     },
 
     // Called when client disconnects
     close(ws) {
-      console.log('Client disconnected');
+        console.log("Client disconnected");
     },
-  });
+});
 ```
 
 ### How Messages Flow in Klopf
@@ -327,12 +332,21 @@ klopf-game/
 ### The Problem
 
 Without shared types:
+
 ```typescript
 // Frontend
-interface Card { id: string; suit: string; rank: string; }
+interface Card {
+    id: string;
+    suit: string;
+    rank: string;
+}
 
 // Backend
-interface Card { id: string; suit: string; rank: string; }
+interface Card {
+    id: string;
+    suit: string;
+    rank: string;
+}
 
 // If you change one, you might forget the other!
 // No compile-time errors if messages don't match
@@ -362,33 +376,36 @@ interface Card { id: string; suit: string; rank: string; }
 ### How It Works
 
 **1. Define schemas in shared package**:
+
 ```typescript
 // packages/shared/src/messages.ts
 export const PlayCardMessage = Type.Object({
-  type: Type.Literal('play_card'),
-  cardId: Type.String(),
+    type: Type.Literal("play_card"),
+    cardId: Type.String(),
 });
 
 export type PlayCardMessage = Static<typeof PlayCardMessage>;
 ```
 
 **2. Backend uses schema for validation**:
+
 ```typescript
 // backend/src/ws/handler.ts
-import { ClientMessageSchema } from '@klopf/shared';
+import { ClientMessageSchema } from "@klopf/shared";
 
-app.ws('/ws', {
-  body: ClientMessageSchema,  // Elysia validates incoming messages
-  message(ws, message) {
-    // message is fully typed!
-    if (message.type === 'play_card') {
-      handlePlayCard(ws, message.cardId);  // TypeScript knows cardId exists
-    }
-  },
+app.ws("/ws", {
+    body: ClientMessageSchema, // Elysia validates incoming messages
+    message(ws, message) {
+        // message is fully typed!
+        if (message.type === "play_card") {
+            handlePlayCard(ws, message.cardId); // TypeScript knows cardId exists
+        }
+    },
 });
 ```
 
 **3. Frontend uses types for compile-time safety**:
+
 ```typescript
 // frontend/src/app/core/services/websocket.service.ts
 import type { ClientMessage, ServerMessage } from '@klopf/shared';
@@ -405,27 +422,27 @@ The message types use TypeScript's discriminated unions:
 
 ```typescript
 type ServerMessage =
-  | { type: 'room_created'; roomCode: string; playerId: string }
-  | { type: 'game_state'; state: GameStateInfo }
-  | { type: 'card_played'; playerId: string; card: Card }
-  | { type: 'error'; error: string };
+    | { type: "room_created"; roomCode: string; playerId: string }
+    | { type: "game_state"; state: GameStateInfo }
+    | { type: "card_played"; playerId: string; card: Card }
+    | { type: "error"; error: string };
 
 // TypeScript narrows the type based on `type` field
 function handleMessage(msg: ServerMessage) {
-  switch (msg.type) {
-    case 'room_created':
-      // TypeScript knows: msg.roomCode and msg.playerId exist
-      console.log(msg.roomCode);
-      break;
-    case 'game_state':
-      // TypeScript knows: msg.state exists
-      console.log(msg.state.players);
-      break;
-    case 'card_played':
-      // TypeScript knows: msg.card exists
-      console.log(msg.card.suit);
-      break;
-  }
+    switch (msg.type) {
+        case "room_created":
+            // TypeScript knows: msg.roomCode and msg.playerId exist
+            console.log(msg.roomCode);
+            break;
+        case "game_state":
+            // TypeScript knows: msg.state exists
+            console.log(msg.state.players);
+            break;
+        case "card_played":
+            // TypeScript knows: msg.card exists
+            console.log(msg.card.suit);
+            break;
+    }
 }
 ```
 
@@ -436,76 +453,80 @@ function handleMessage(msg: ServerMessage) {
 ### Backend Flow
 
 **1. Server starts** (`backend/src/index.ts`):
+
 ```typescript
 const app = new Elysia()
-  .get('/health', () => ({ status: 'ok' }))
-  .use(wsHandler)  // WebSocket handler plugin
-  .listen(8080);
+    .get("/health", () => ({ status: "ok" }))
+    .use(wsHandler) // WebSocket handler plugin
+    .listen(8080);
 ```
 
 **2. WebSocket handler** (`backend/src/ws/handler.ts`):
+
 ```typescript
-export const wsHandler = new Elysia().ws('/ws', {
-  body: ClientMessageSchema,  // Validates incoming messages
+export const wsHandler = new Elysia().ws("/ws", {
+    body: ClientMessageSchema, // Validates incoming messages
 
-  open(ws) {
-    console.log('Client connected');
-  },
+    open(ws) {
+        console.log("Client connected");
+    },
 
-  message(ws, message) {
-    handleMessage(ws, message);  // Route to appropriate handler
-  },
+    message(ws, message) {
+        handleMessage(ws, message); // Route to appropriate handler
+    },
 
-  close(ws) {
-    handleDisconnect(ws);
-  },
+    close(ws) {
+        handleDisconnect(ws);
+    },
 });
 ```
 
 **3. Message routing**:
+
 ```typescript
 function handleMessage(ws, message: ClientMessage) {
-  switch (message.type) {
-    case 'create_room':
-      handleCreateRoom(ws, message.playerName);
-      break;
-    case 'join_room':
-      handleJoinRoom(ws, message.roomCode, message.playerName);
-      break;
-    case 'play_card':
-      handlePlayCard(ws, message.cardId);
-      break;
-    // ... etc
-  }
+    switch (message.type) {
+        case "create_room":
+            handleCreateRoom(ws, message.playerName);
+            break;
+        case "join_room":
+            handleJoinRoom(ws, message.roomCode, message.playerName);
+            break;
+        case "play_card":
+            handlePlayCard(ws, message.cardId);
+            break;
+        // ... etc
+    }
 }
 ```
 
 **4. Example: Create Room**:
+
 ```typescript
 function handleCreateRoom(ws, playerName: string) {
-  // 1. Generate IDs
-  const playerId = crypto.randomUUID();
+    // 1. Generate IDs
+    const playerId = crypto.randomUUID();
 
-  // 2. Create player and room
-  const player = new Player(playerId, playerName);
-  const room = roomManager.createRoom(playerId);
-  room.addPlayer(player);
+    // 2. Create player and room
+    const player = new Player(playerId, playerName);
+    const room = roomManager.createRoom(playerId);
+    room.addPlayer(player);
 
-  // 3. Track connection
-  registerConnection(ws, playerId, room.code);
+    // 3. Track connection
+    registerConnection(ws, playerId, room.code);
 
-  // 4. Send response
-  send(ws, {
-    type: 'room_created',
-    roomCode: room.code,
-    playerId,
-  });
+    // 4. Send response
+    send(ws, {
+        type: "room_created",
+        roomCode: room.code,
+        playerId,
+    });
 
-  // 5. Send initial game state
-  send(ws, {
-    type: 'game_state',
-    state: room.game.toGameStateInfo(),
-  });
+    // 5. Send initial game state
+    send(ws, {
+        type: "game_state",
+        state: room.game.toGameStateInfo(),
+    });
 }
 ```
 
@@ -525,25 +546,25 @@ const playerRooms = new Map<string, string>();
 
 // When player connects
 function registerConnection(ws, playerId, roomCode) {
-  connections.set(ws, playerId);
-  playerConns.set(playerId, ws);
-  playerRooms.set(playerId, roomCode);
+    connections.set(ws, playerId);
+    playerConns.set(playerId, ws);
+    playerRooms.set(playerId, roomCode);
 }
 
 // To send to a specific player
 function sendToPlayer(playerId: string, msg: ServerMessage) {
-  const ws = playerConns.get(playerId);
-  if (ws) send(ws, msg);
+    const ws = playerConns.get(playerId);
+    if (ws) send(ws, msg);
 }
 
 // To broadcast to all in room
 function broadcastToRoom(roomCode: string, msg: ServerMessage) {
-  const room = roomManager.getRoom(roomCode);
-  for (const player of room.game.players) {
-    if (player.connected) {
-      sendToPlayer(player.id, msg);
+    const room = roomManager.getRoom(roomCode);
+    for (const player of room.game.players) {
+        if (player.connected) {
+            sendToPlayer(player.id, msg);
+        }
     }
-  }
 }
 ```
 
@@ -563,113 +584,115 @@ Key game logic (`backend/src/game/game.ts`):
 
 ```typescript
 class Game {
-  state: GameState = 'lobby';
-  players: Player[] = [];
-  currentPlayerIndex: number = 0;
-  currentTrick: Trick | null = null;
+    state: GameState = "lobby";
+    players: Player[] = [];
+    currentPlayerIndex: number = 0;
+    currentTrick: Trick | null = null;
 
-  playCard(playerId: string, cardId: string): string | null {
-    // 1. Validate state
-    if (this.state !== 'playing') {
-      return 'Wrong game state';
+    playCard(playerId: string, cardId: string): string | null {
+        // 1. Validate state
+        if (this.state !== "playing") {
+            return "Wrong game state";
+        }
+
+        // 2. Validate turn
+        const currentPlayer = this.getCurrentPlayer();
+        if (currentPlayer.id !== playerId) {
+            return "Not your turn";
+        }
+
+        // 3. Validate card in hand
+        if (!currentPlayer.hasCard(cardId)) {
+            return "Card not in hand";
+        }
+
+        // 4. Validate suit following
+        if (mustFollowSuit && cardIsWrongSuit) {
+            return "Must follow suit";
+        }
+
+        // 5. Play the card
+        const card = currentPlayer.removeCard(cardId);
+        this.currentTrick.addCard(playerId, card);
+
+        // 6. Check if trick complete
+        if (this.currentTrick.isComplete(alivePlayerCount)) {
+            this.completeTrick();
+        } else {
+            this.advanceToNextPlayer();
+        }
+
+        return null; // Success (null means no error)
     }
-
-    // 2. Validate turn
-    const currentPlayer = this.getCurrentPlayer();
-    if (currentPlayer.id !== playerId) {
-      return 'Not your turn';
-    }
-
-    // 3. Validate card in hand
-    if (!currentPlayer.hasCard(cardId)) {
-      return 'Card not in hand';
-    }
-
-    // 4. Validate suit following
-    if (mustFollowSuit && cardIsWrongSuit) {
-      return 'Must follow suit';
-    }
-
-    // 5. Play the card
-    const card = currentPlayer.removeCard(cardId);
-    this.currentTrick.addCard(playerId, card);
-
-    // 6. Check if trick complete
-    if (this.currentTrick.isComplete(alivePlayerCount)) {
-      this.completeTrick();
-    } else {
-      this.advanceToNextPlayer();
-    }
-
-    return null;  // Success (null means no error)
-  }
 }
 ```
 
 ### Frontend Flow
 
 **1. WebSocket Service** (`websocket.service.ts`):
+
 ```typescript
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class WebsocketService {
-  private socket: WebSocket | null = null;
-  private messages$ = new Subject<ServerMessage>();
+    private socket: WebSocket | null = null;
+    private messages$ = new Subject<ServerMessage>();
 
-  connect(): void {
-    this.socket = new WebSocket('ws://localhost:8080/ws');
+    connect(): void {
+        this.socket = new WebSocket("ws://localhost:5551/ws");
 
-    this.socket.onmessage = (event) => {
-      const message = JSON.parse(event.data) as ServerMessage;
-      this.messages$.next(message);  // Push to observable
-    };
-  }
+        this.socket.onmessage = (event) => {
+            const message = JSON.parse(event.data) as ServerMessage;
+            this.messages$.next(message); // Push to observable
+        };
+    }
 
-  send(message: ClientMessage): void {
-    this.socket.send(JSON.stringify(message));
-  }
+    send(message: ClientMessage): void {
+        this.socket.send(JSON.stringify(message));
+    }
 
-  // Convenience methods
-  playCard(cardId: string) {
-    this.send({ type: 'play_card', cardId });
-  }
+    // Convenience methods
+    playCard(cardId: string) {
+        this.send({ type: "play_card", cardId });
+    }
 }
 ```
 
 **2. Game State Service** (`game-state.service.ts`):
+
 ```typescript
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class GameStateService {
-  // Angular Signals for reactive state
-  private _gameState = signal<GameStateInfo | null>(null);
-  private _myCards = signal<Card[]>([]);
+    // Angular Signals for reactive state
+    private _gameState = signal<GameStateInfo | null>(null);
+    private _myCards = signal<Card[]>([]);
 
-  // Public readonly
-  readonly gameState = this._gameState.asReadonly();
-  readonly myCards = this._myCards.asReadonly();
+    // Public readonly
+    readonly gameState = this._gameState.asReadonly();
+    readonly myCards = this._myCards.asReadonly();
 
-  // Computed values
-  readonly isMyTurn = computed(() => {
-    const state = this._gameState();
-    const myId = this._playerId();
-    return state?.currentPlayerId === myId && state?.state === 'playing';
-  });
+    // Computed values
+    readonly isMyTurn = computed(() => {
+        const state = this._gameState();
+        const myId = this._playerId();
+        return state?.currentPlayerId === myId && state?.state === "playing";
+    });
 
-  constructor(private ws: WebsocketService) {
-    // Subscribe to all messages
-    ws.messages.subscribe(msg => this.handleMessage(msg));
-  }
-
-  private handleMessage(msg: ServerMessage) {
-    switch (msg.type) {
-      case 'game_state':
-        this._gameState.set(msg.state);
-        break;
-      case 'cards_dealt':
-        this._myCards.set(msg.cards);
-        break;
-      // ... etc
+    constructor(private ws: WebsocketService) {
+        // Subscribe to all messages
+        ws.messages.subscribe((msg) => this.handleMessage(msg));
     }
-  }
+
+    private handleMessage(msg: ServerMessage) {
+        switch (msg.type) {
+            case "game_state":
+                this._gameState.set(msg.state);
+                break;
+            case "cards_dealt":
+                this._myCards.set(msg.cards);
+                break;
+            // ... etc
+        }
+    }
 }
 ```
 
@@ -719,58 +742,58 @@ pnpm dev
 
 ### Client → Server (12 types)
 
-| Type | Description | Fields |
-|------|-------------|--------|
-| `create_room` | Create new room | `playerName` |
-| `join_room` | Join existing room | `roomCode`, `playerName` |
-| `reconnect` | Reconnect to game | `roomCode`, `playerId` |
-| `start_game` | Start the game | - |
-| `close_room` | Close room (owner) | - |
-| `play_card` | Play a card | `cardId` |
-| `klopf` | Initiate klopf | - |
-| `klopf_response` | Respond to klopf | `mitgehen` (bool) |
-| `blind_drei` | Blind auf 3 | - |
-| `set_stakes` | Set stakes (owner) | `stakes` |
-| `request_redeal` | Request redeal | - |
-| `redeal_response` | Respond to redeal | `agree` (bool) |
+| Type              | Description        | Fields                   |
+| ----------------- | ------------------ | ------------------------ |
+| `create_room`     | Create new room    | `playerName`             |
+| `join_room`       | Join existing room | `roomCode`, `playerName` |
+| `reconnect`       | Reconnect to game  | `roomCode`, `playerId`   |
+| `start_game`      | Start the game     | -                        |
+| `close_room`      | Close room (owner) | -                        |
+| `play_card`       | Play a card        | `cardId`                 |
+| `klopf`           | Initiate klopf     | -                        |
+| `klopf_response`  | Respond to klopf   | `mitgehen` (bool)        |
+| `blind_drei`      | Blind auf 3        | -                        |
+| `set_stakes`      | Set stakes (owner) | `stakes`                 |
+| `request_redeal`  | Request redeal     | -                        |
+| `redeal_response` | Respond to redeal  | `agree` (bool)           |
 
 ### Server → Client (21 types)
 
-| Type | Description | Fields |
-|------|-------------|--------|
-| `room_created` | Room created | `roomCode`, `playerId` |
-| `room_closed` | Room closed | - |
-| `player_joined` | Player joined | `player` |
-| `player_left` | Player disconnected | `playerId` |
-| `game_started` | Game began | - |
-| `game_state` | Full state update | `state` |
-| `cards_dealt` | Your cards | `cards[]` |
-| `card_played` | Card was played | `playerId`, `card` |
-| `your_turn` | It's your turn | - |
-| `klopf_initiated` | Klopf started | `playerId`, `level` |
-| `klopf_response_needed` | Must respond | `level` |
-| `klopf_resolved` | Klopf finished | `level` |
-| `trick_won` | Trick winner | `winnerId` |
-| `round_ended` | Round results | `results[]` |
-| `game_over` | Game finished | `winnerId`, `perfectWin`, `stakes`, `winnings` |
-| `error` | Error occurred | `error` |
-| `timer_update` | Turn timer | `timeLeft` |
-| `redeal_requested` | Redeal requested | `playerId` |
-| `redeal_response_needed` | Must respond | `redealCount`, `maxRedeals` |
-| `redeal_performed` | Redeal done | `redealCount`, `maxRedeals` |
-| `redeal_declined` | Redeal refused | - |
+| Type                     | Description         | Fields                                         |
+| ------------------------ | ------------------- | ---------------------------------------------- |
+| `room_created`           | Room created        | `roomCode`, `playerId`                         |
+| `room_closed`            | Room closed         | -                                              |
+| `player_joined`          | Player joined       | `player`                                       |
+| `player_left`            | Player disconnected | `playerId`                                     |
+| `game_started`           | Game began          | -                                              |
+| `game_state`             | Full state update   | `state`                                        |
+| `cards_dealt`            | Your cards          | `cards[]`                                      |
+| `card_played`            | Card was played     | `playerId`, `card`                             |
+| `your_turn`              | It's your turn      | -                                              |
+| `klopf_initiated`        | Klopf started       | `playerId`, `level`                            |
+| `klopf_response_needed`  | Must respond        | `level`                                        |
+| `klopf_resolved`         | Klopf finished      | `level`                                        |
+| `trick_won`              | Trick winner        | `winnerId`                                     |
+| `round_ended`            | Round results       | `results[]`                                    |
+| `game_over`              | Game finished       | `winnerId`, `perfectWin`, `stakes`, `winnings` |
+| `error`                  | Error occurred      | `error`                                        |
+| `timer_update`           | Turn timer          | `timeLeft`                                     |
+| `redeal_requested`       | Redeal requested    | `playerId`                                     |
+| `redeal_response_needed` | Must respond        | `redealCount`, `maxRedeals`                    |
+| `redeal_performed`       | Redeal done         | `redealCount`, `maxRedeals`                    |
+| `redeal_declined`        | Redeal refused      | -                                              |
 
 ---
 
 ## Key Differences from Go Backend
 
-| Aspect | Go | TypeScript |
-|--------|-----|------------|
-| **Concurrency** | `sync.RWMutex` for thread safety | Not needed (single-threaded event loop) |
-| **Timers** | `time.AfterFunc` | `setTimeout()` |
-| **Maps** | `map[string]*Room` | `Map<string, Room>` |
-| **Error handling** | Return `error` | Return `string \| null` |
-| **Type safety** | Runtime only | Compile-time + runtime |
+| Aspect             | Go                               | TypeScript                              |
+| ------------------ | -------------------------------- | --------------------------------------- |
+| **Concurrency**    | `sync.RWMutex` for thread safety | Not needed (single-threaded event loop) |
+| **Timers**         | `time.AfterFunc`                 | `setTimeout()`                          |
+| **Maps**           | `map[string]*Room`               | `Map<string, Room>`                     |
+| **Error handling** | Return `error`                   | Return `string \| null`                 |
+| **Type safety**    | Runtime only                     | Compile-time + runtime                  |
 
 The TypeScript version is simpler because JavaScript's event loop is single-threaded - no need for mutexes or locks!
 
