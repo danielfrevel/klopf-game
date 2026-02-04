@@ -21,7 +21,7 @@ COPY frontend/ ./frontend/
 RUN pnpm --filter @klopf/shared run build && pnpm --filter frontend run build
 
 # Production stage
-FROM nginx:alpine
+FROM nginxinc/nginx-unprivileged:alpine
 
 # Copy built app
 COPY --from=builder /app/frontend/dist/frontend/browser /usr/share/nginx/html
@@ -29,6 +29,4 @@ COPY --from=builder /app/frontend/dist/frontend/browser /usr/share/nginx/html
 # Copy nginx config
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8080
