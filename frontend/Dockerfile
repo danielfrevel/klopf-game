@@ -3,24 +3,31 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-RUN npm ci
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy source
-COPY . .
+# Copy monorepo config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/ ./packages/
+COPY frontend/package.json ./frontend/
 
-# Build
-RUN npm run build
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy frontend source
+COPY frontend/ ./frontend/
+
+# Build shared package first, then frontend
+RUN pnpm --filter @klopf/shared run build && pnpm --filter frontend run build
 
 # Production stage
 FROM nginx:alpine
 
 # Copy built app
-COPY --from=builder /app/dist/frontend/browser /usr/share/nginx/html
+COPY --from=builder /app/frontend/dist/frontend/browser /usr/share/nginx/html
 
 # Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

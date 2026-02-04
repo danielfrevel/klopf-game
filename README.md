@@ -26,9 +26,10 @@ Ein Multiplayer-Kartenspiel mit WebSocket-Unterstützung.
 
 ## Tech Stack
 
-- **Backend**: Go + gorilla/websocket
-- **Frontend**: Angular 19 + TailwindCSS v4 + DaisyUI
-- **Dev Environment**: Nix Flake
+- **Backend**: Bun + Elysia (TypeScript)
+- **Frontend**: Angular 21 + TailwindCSS v4 + DaisyUI
+- **Shared Types**: @klopf/shared (TypeBox)
+- **Dev Environment**: Nix Flake + pnpm Monorepo
 
 ## Entwicklung
 
@@ -39,8 +40,9 @@ Ein Multiplayer-Kartenspiel mit WebSocket-Unterstützung.
 ```
 
 Startet tmux mit 3 Fenstern:
+
 - `shell` - Nix-Shell für Befehle
-- `backend` - Go-Server auf Port 8080
+- `backend` - Bun-Server auf Port 8080
 - `frontend` - Angular auf Port 4200
 
 ### Mit Nix (manuell)
@@ -54,8 +56,11 @@ direnv allow
 # oder manuell:
 nix develop
 
+# Shared Types bauen (einmalig)
+pnpm --filter @klopf/shared run build
+
 # Backend starten
-cd backend && go run cmd/server/main.go
+cd backend && bun --watch src/index.ts
 
 # Frontend starten (neues Terminal)
 cd frontend && npm start
@@ -64,20 +69,23 @@ cd frontend && npm start
 ### Ohne Nix
 
 Benötigt:
-- Go 1.23+
+
+- Bun (latest)
 - Node.js 22+
-- npm oder pnpm
+- pnpm
 
 ```bash
+# Dependencies installieren
+pnpm install
+
+# Shared Types bauen
+pnpm --filter @klopf/shared run build
+
 # Backend
-cd backend
-go mod download
-go run cmd/server/main.go
+cd backend && bun --watch src/index.ts
 
 # Frontend
-cd frontend
-npm install
-npm start
+cd frontend && pnpm start
 ```
 
 ### Mit Docker
@@ -87,24 +95,32 @@ docker compose up --build
 ```
 
 Zugriff:
+
 - Frontend: http://localhost:4200
-- Backend WebSocket: ws://localhost:8080/ws
+- Backend WebSocket: ws://localhost:5551/ws
 
 ## Projektstruktur
 
 ```
 klopf-game/
+├── packages/shared/            # @klopf/shared - Geteilte Types
+│   └── src/
+│       ├── card.ts             # Card Types & Schemas
+│       ├── player.ts           # Player Types
+│       ├── game.ts             # GameState Types
+│       └── messages.ts         # WebSocket Message Types
 ├── backend/
-│   ├── cmd/server/main.go      # Server-Einstiegspunkt
-│   └── internal/
+│   └── src/
+│       ├── index.ts            # Server-Einstiegspunkt
 │       ├── game/               # Spiellogik
 │       ├── room/               # Raumverwaltung
 │       └── ws/                 # WebSocket-Handler
-└── frontend/
-    └── src/app/
-        ├── core/               # Services & Models
-        ├── features/           # Lobby, Game, Results
-        └── shared/             # Wiederverwendbare Komponenten
+├── frontend/
+│   └── src/app/
+│       ├── core/               # Services & Models
+│       ├── features/           # Lobby, Game, Results
+│       └── shared/             # Wiederverwendbare Komponenten
+└── backend-go/                 # Archiviertes Go Backend (nur Referenz)
 ```
 
 ## WebSocket-Protokoll
