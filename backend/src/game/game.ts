@@ -122,6 +122,7 @@ export class Game {
     this.deck.shuffle();
 
     // Check for 1-life auto-klopf and deal cards
+    let autoKlopfInitiated = false;
     for (const player of this.players) {
       if (player.isAlive()) {
         player.hasSeenCards = true;
@@ -129,7 +130,10 @@ export class Game {
 
         if (player.lives === 1) {
           player.mustMitgehen = true;
-          this.klopf.initiate(player.id);
+          if (!autoKlopfInitiated) {
+            this.klopf.initiate(player.id);
+            autoKlopfInitiated = true;
+          }
         } else {
           player.mustMitgehen = false;
         }
@@ -458,13 +462,17 @@ export class Game {
     this.deck.shuffle();
 
     // Deal new cards to alive players
+    let autoKlopfInitiated = false;
     for (const player of this.players) {
       if (player.isAlive()) {
         player.hand = this.deck.deal(CARDS_PER_PLAYER);
         player.hasSeenCards = true;
         if (player.lives === 1) {
           player.mustMitgehen = true;
-          this.klopf.initiate(player.id);
+          if (!autoKlopfInitiated) {
+            this.klopf.initiate(player.id);
+            autoKlopfInitiated = true;
+          }
         } else {
           player.mustMitgehen = false;
         }

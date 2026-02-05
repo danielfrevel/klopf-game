@@ -58,12 +58,12 @@ export const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs'];
 export const RANKS: Rank[] = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 // Rank values for comparison (higher = better)
-// In Klopf: 10 > 9 > 8 > 7 > J > Q > K > A
+// In Klopf: 10 > 9 > 8 > 7 > A > K > Q > J
 export const RANK_VALUES: Record<Rank, number> = {
-  'A': 1,
-  'K': 2,
-  'Q': 3,
-  'J': 4,
+  'J': 1,
+  'Q': 2,
+  'K': 3,
+  'A': 4,
   '7': 5,
   '8': 6,
   '9': 7,

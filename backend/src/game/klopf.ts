@@ -46,8 +46,8 @@ export class KlopfState {
     this.responses = new Map();
     this.lastKlopper = playerId;
 
-    // The initiator is automatically a participant
-    this.participants.push(playerId);
+    // Reset participants and add initiator
+    this.participants = [playerId];
 
     return null;
   }
