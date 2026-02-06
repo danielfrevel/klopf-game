@@ -30,14 +30,31 @@ export const TrickSchema = Type.Object({
 });
 export type Trick = Static<typeof TrickSchema>;
 
+// Klopf response entry
+export const KlopfResponseSchema = Type.Object({
+  playerId: Type.String(),
+  playerName: Type.String(),
+  mitgehen: Type.Union([Type.Boolean(), Type.Null()]),
+});
+export type KlopfResponse = Static<typeof KlopfResponseSchema>;
+
 // Klopf state
 export const KlopfStateSchema = Type.Object({
   active: Type.Boolean(),
   initiator: Type.String(),
   level: Type.Number(),
   participants: Type.Array(Type.String()),
+  responses: Type.Optional(Type.Array(KlopfResponseSchema)),
 });
 export type KlopfState = Static<typeof KlopfStateSchema>;
+
+// Completed trick info (for history)
+export const CompletedTrickSchema = Type.Object({
+  cards: Type.Array(TrickCardSchema),
+  leadSuit: Type.String(),
+  winnerId: Type.String(),
+});
+export type CompletedTrick = Static<typeof CompletedTrickSchema>;
 
 // Full game state info (sent to clients)
 export const GameStateInfoSchema = Type.Object({
@@ -51,6 +68,7 @@ export const GameStateInfoSchema = Type.Object({
   maxRedeals: Type.Number(),
   currentTrick: Type.Optional(TrickSchema),
   klopf: Type.Optional(KlopfStateSchema),
+  completedTricks: Type.Optional(Type.Array(CompletedTrickSchema)),
 });
 export type GameStateInfo = Static<typeof GameStateInfoSchema>;
 

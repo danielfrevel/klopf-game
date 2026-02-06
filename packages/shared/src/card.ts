@@ -38,12 +38,12 @@ export const SUIT_SYMBOLS: Record<Suit, string> = {
   clubs: '♣',
 };
 
-// Suit colors for display (Tailwind classes)
+// Suit colors for display (CSS color values for inline styles - avoids DaisyUI overrides)
 export const SUIT_COLORS: Record<Suit, string> = {
-  spades: 'text-gray-900',
-  hearts: 'text-red-600',
-  diamonds: 'text-red-600',
-  clubs: 'text-gray-900',
+  spades: '#111827',
+  hearts: '#dc2626',
+  diamonds: '#dc2626',
+  clubs: '#111827',
 };
 
 // Get card display string (e.g., "7♠")

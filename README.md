@@ -48,7 +48,6 @@ Startet tmux mit 3 Fenstern:
 ### Mit Nix (manuell)
 
 ```bash
-# In das Projektverzeichnis wechseln
 cd klopf-game
 
 # Nix-Shell aktivieren (mit direnv automatisch)
@@ -75,10 +74,7 @@ Benötigt:
 - pnpm
 
 ```bash
-# Dependencies installieren
 pnpm install
-
-# Shared Types bauen
 pnpm --filter @klopf/shared run build
 
 # Backend
@@ -112,15 +108,30 @@ klopf-game/
 ├── backend/
 │   └── src/
 │       ├── index.ts            # Server-Einstiegspunkt
-│       ├── game/               # Spiellogik
-│       ├── room/               # Raumverwaltung
+│       ├── game/               # Spiellogik (funktional)
+│       │   ├── types.ts        # Interfaces (PlayerState, GameData, etc.)
+│       │   ├── card.ts         # Karten-Vergleiche
+│       │   ├── deck.ts         # Deck erstellen, mischen, austeilen
+│       │   ├── player.ts       # Spieler-Funktionen
+│       │   ├── trick.ts        # Stich-Funktionen
+│       │   ├── klopf.ts        # Klopf-Logik
+│       │   ├── game.ts         # Haupt-Spiellogik
+│       │   └── room.ts         # Raum-Verwaltung
 │       └── ws/                 # WebSocket-Handler
+│           ├── handler.ts      # Router (Elysia WS setup)
+│           ├── connections.ts  # Connection-Tracking
+│           ├── broadcast.ts    # Nachrichten senden
+│           └── handlers/       # Message-Handler
+│               ├── room.ts     # create/join/reconnect/close
+│               ├── game.ts     # start/play_card/stakes
+│               ├── klopf.ts    # klopf/response/blind_drei
+│               └── redeal.ts   # request/response
 ├── frontend/
 │   └── src/app/
-│       ├── core/               # Services & Models
+│       ├── core/services/      # GameStateService, WebsocketService, Logger
 │       ├── features/           # Lobby, Game, Results
-│       └── shared/             # Wiederverwendbare Komponenten
-└── backend-go/                 # Archiviertes Go Backend (nur Referenz)
+│       └── shared/components/  # Card, PlayerHand, TrickArea, etc.
+└── docker-compose.yml
 ```
 
 ## WebSocket-Protokoll
@@ -129,10 +140,16 @@ klopf-game/
 
 - `create_room` - Neuen Raum erstellen
 - `join_room` - Raum beitreten
+- `reconnect` - Reconnect nach Disconnect
 - `start_game` - Spiel starten (nur Host)
 - `play_card` - Karte ausspielen
 - `klopf` - Klopfen
 - `klopf_response` - Auf Klopfen antworten
+- `blind_drei` - Blind auf 3
+- `set_stakes` - Einsatz setzen
+- `request_redeal` - Einigung anfragen
+- `redeal_response` - Auf Einigung antworten
+- `close_room` - Raum schließen
 
 ### Server -> Client
 
@@ -141,4 +158,14 @@ klopf-game/
 - `cards_dealt` - Karten wurden ausgeteilt
 - `card_played` - Karte wurde gespielt
 - `klopf_initiated` - Jemand hat geklopft
+- `klopf_response_needed` - Klopf-Antwort benötigt
+- `klopf_resolved` - Klopf wurde aufgelöst
+- `trick_won` - Stich gewonnen
+- `round_ended` - Runde beendet
 - `game_over` - Spiel ist beendet
+- `redeal_requested` - Einigung angefragt
+- `redeal_performed` - Neu ausgeteilt
+- `redeal_declined` - Einigung abgelehnt
+- `player_joined` / `player_left` - Spieler-Events
+- `room_closed` - Raum geschlossen
+- `error` - Fehlermeldung

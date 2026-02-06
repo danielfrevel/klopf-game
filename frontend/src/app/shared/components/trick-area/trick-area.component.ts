@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Trick, Player } from '../../../core/models';
+import { Trick, Player } from '@klopf/shared';
 import { CardComponent } from '../card/card.component';
 
 @Component({

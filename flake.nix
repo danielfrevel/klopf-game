@@ -19,9 +19,6 @@
           nodePackages.pnpm
           nodePackages.typescript
 
-          # Go (archived backend reference)
-          go
-          gopls
         ];
 
         shellHook = ''
@@ -42,7 +39,7 @@
           echo "  packages/shared/    - Shared types (@klopf/shared)"
           echo "  backend/            - Bun + ElysiaJS server"
           echo "  frontend/           - Angular app"
-          echo "  backend-go/         - Archived Go backend"
+          echo "  ubergabe.md         - Handover documentation"
         '';
       };
     };

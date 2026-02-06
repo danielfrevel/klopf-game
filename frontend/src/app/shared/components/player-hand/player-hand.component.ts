@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Card } from '../../../core/models';
+import { Card } from '@klopf/shared';
 import { CardComponent } from '../card/card.component';
 
 @Component({

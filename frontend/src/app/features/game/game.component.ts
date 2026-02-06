@@ -1,16 +1,18 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { WebsocketService, GameStateService } from '../../core/services';
-import { Card } from '../../core/models';
+import { Card } from '@klopf/shared';
 import { PlayerHandComponent } from '../../shared/components/player-hand/player-hand.component';
 import { TrickAreaComponent } from '../../shared/components/trick-area/trick-area.component';
+import { TrickHistoryComponent } from '../../shared/components/trick-history/trick-history.component';
 import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf-dialog.component';
 
 @Component({
   selector: 'app-game',
   standalone: true,
-  imports: [CommonModule, PlayerHandComponent, TrickAreaComponent, KlopfDialogComponent],
+  imports: [CommonModule, PlayerHandComponent, TrickAreaComponent, TrickHistoryComponent, KlopfDialogComponent],
   template: `
     <div class="min-h-screen bg-base-200 flex flex-col">
       <!-- Header -->
@@ -71,6 +73,14 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           </div>
         </div>
 
+        <!-- Trick History -->
+        <div class="w-full max-w-2xl mx-auto">
+          <app-trick-history
+            [tricks]="gameState.gameState()?.completedTricks || []"
+            [players]="gameState.gameState()?.players || []"
+          />
+        </div>
+
         <!-- Current Turn Indicator -->
         <div class="text-center">
           @if (gameState.isMyTurn()) {
@@ -83,10 +93,14 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
         <!-- Action Buttons -->
         <div class="flex justify-center gap-4">
           @if (canKlopf()) {
-            <button class="btn btn-warning btn-lg" (click)="klopf()">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+            <button class="btn btn-warning btn-lg" [disabled]="klopfPending()" (click)="klopf()">
+              @if (klopfPending()) {
+                <span class="loading loading-spinner loading-sm"></span>
+              } @else {
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              }
               Klopfen!
             </button>
           }
@@ -125,6 +139,27 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           />
         </div>
       </main>
+
+      <!-- Klopf Status Panel (for initiator) -->
+      @if (isKlopfInitiator()) {
+        <div class="fixed bottom-4 right-4 z-40 card bg-base-100 shadow-xl border border-warning p-4 min-w-[200px]">
+          <h4 class="font-bold text-sm mb-2">Klopf-Status (Stufe {{ gameState.gameState()?.klopf?.level }})</h4>
+          <ul class="space-y-1">
+            @for (resp of gameState.gameState()?.klopf?.responses || []; track resp.playerId) {
+              <li class="flex items-center justify-between text-sm gap-2">
+                <span>{{ resp.playerName }}</span>
+                @if (resp.mitgehen === null) {
+                  <span class="badge badge-ghost badge-sm">...</span>
+                } @else if (resp.mitgehen) {
+                  <span class="badge badge-success badge-sm">Mit</span>
+                } @else {
+                  <span class="badge badge-error badge-sm">Nein</span>
+                }
+              </li>
+            }
+          </ul>
+        </div>
+      }
 
       <!-- Klopf Dialog -->
       @if (gameState.klopfResponseNeeded()) {
@@ -222,8 +257,10 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
     </div>
   `
 })
-export class GameComponent implements OnInit {
+export class GameComponent implements OnInit, OnDestroy {
   selectedCard = signal<Card | null>(null);
+  klopfPending = signal<boolean>(false);
+  private msgSub?: Subscription;
 
   currentPlayerName = computed(() => {
     const state = this.gameState.gameState();
@@ -239,10 +276,19 @@ export class GameComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Redirect to lobby if not in game
     if (!this.gameState.roomCode()) {
       this.router.navigate(['/']);
     }
+
+    this.msgSub = this.ws.messages.subscribe(msg => {
+      if (msg.type === 'klopf_resolved' || msg.type === 'klopf_initiated') {
+        this.klopfPending.set(false);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.msgSub?.unsubscribe();
   }
 
   selectCard(card: Card): void {
@@ -283,6 +329,7 @@ export class GameComponent implements OnInit {
   }
 
   klopf(): void {
+    this.klopfPending.set(true);
     this.ws.klopf();
   }
 
@@ -322,6 +369,11 @@ export class GameComponent implements OnInit {
     const state = this.gameState.gameState();
     const remaining = (state?.maxRedeals || 3) - (state?.redealCount || 0);
     return `${remaining} übrig`;
+  }
+
+  isKlopfInitiator(): boolean {
+    const state = this.gameState.gameState();
+    return !!(state?.klopf?.active && state.klopf.initiator === this.gameState.playerId());
   }
 
   getKlopfInitiatorName(): string {

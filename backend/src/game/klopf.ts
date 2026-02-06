@@ -1,6 +1,6 @@
 import type { KlopfState as KlopfStateInfo } from '@klopf/shared';
+import type { KlopfData } from './types.js';
 
-// Error messages for klopf operations
 export const KlopfErrors = {
   CANNOT_KLOPF_TWICE: 'Cannot klopf twice in a row',
   KLOPF_ALREADY_ACTIVE: 'Klopf is already active',
@@ -10,97 +10,99 @@ export const KlopfErrors = {
   KLOPF_LIMIT_EXCEEDED: 'Klopf level would exceed lives + 1',
 } as const;
 
-export class KlopfState {
-  active: boolean = false;
-  initiator: string = '';
-  level: number = 0;
-  participants: string[] = []; // Players who are still in (mitgegangen)
-  responses: Map<string, boolean> = new Map(); // true = mitgehen, false = not mitgehen
-  lastKlopper: string = ''; // Cannot klopf twice in a row
+export function createKlopfData(): KlopfData {
+  return {
+    active: false,
+    initiator: '',
+    level: 0,
+    participants: [],
+    responses: new Map(),
+    lastKlopper: '',
+  };
+}
 
-  // Reset for a new round (keeps lastKlopper)
-  reset(): void {
-    this.active = false;
-    this.initiator = '';
-    this.level = 0;
-    this.participants = [];
-    this.responses = new Map();
-    // lastKlopper persists across rounds
+export function resetKlopf(klopf: KlopfData): void {
+  klopf.active = false;
+  klopf.initiator = '';
+  klopf.level = 0;
+  klopf.participants = [];
+  klopf.responses = new Map();
+}
+
+export function resetKlopfForNewGame(klopf: KlopfData): void {
+  resetKlopf(klopf);
+  klopf.lastKlopper = '';
+}
+
+export function initiateKlopf(klopf: KlopfData, playerId: string): string | null {
+  if (klopf.lastKlopper === playerId) {
+    return KlopfErrors.CANNOT_KLOPF_TWICE;
   }
 
-  // Reset for a new game (clears everything)
-  resetForNewGame(): void {
-    this.reset();
-    this.lastKlopper = '';
+  klopf.active = true;
+  klopf.initiator = playerId;
+  klopf.level++;
+  klopf.responses = new Map();
+  klopf.lastKlopper = playerId;
+  klopf.participants = [playerId];
+
+  return null;
+}
+
+export function respondKlopf(
+  klopf: KlopfData,
+  playerId: string,
+  mitgehen: boolean,
+  mustMitgehen: boolean,
+): string | null {
+  if (!klopf.active) return KlopfErrors.NOT_IN_KLOPF;
+  if (klopf.responses.has(playerId)) return KlopfErrors.ALREADY_RESPONDED;
+  if (mustMitgehen && !mitgehen) return KlopfErrors.MUST_MITGEHEN;
+
+  klopf.responses.set(playerId, mitgehen);
+  if (mitgehen) {
+    klopf.participants.push(playerId);
   }
 
-  // Initiate a new klopf or counter-klopf
-  initiate(playerId: string): string | null {
-    if (this.lastKlopper === playerId) {
-      return KlopfErrors.CANNOT_KLOPF_TWICE;
-    }
+  return null;
+}
 
-    this.active = true;
-    this.initiator = playerId;
-    this.level++;
-    this.responses = new Map();
-    this.lastKlopper = playerId;
+export function allKlopfResponded(klopf: KlopfData, playerIds: string[]): boolean {
+  for (const id of playerIds) {
+    if (id === klopf.initiator) continue;
+    if (!klopf.responses.has(id)) return false;
+  }
+  return true;
+}
 
-    // Reset participants and add initiator
-    this.participants = [playerId];
+export function getKlopfPenalty(klopf: KlopfData): number {
+  return 1 + klopf.level;
+}
 
-    return null;
+export function isKlopfParticipant(klopf: KlopfData, playerId: string): boolean {
+  return klopf.participants.includes(playerId);
+}
+
+export function toKlopfStateInfo(
+  klopf: KlopfData,
+  players?: { id: string; name: string }[],
+): KlopfStateInfo {
+  const info: KlopfStateInfo = {
+    active: klopf.active,
+    initiator: klopf.initiator,
+    level: klopf.level,
+    participants: [...klopf.participants],
+  };
+
+  if (players) {
+    info.responses = players
+      .filter((p) => p.id !== klopf.initiator)
+      .map((p) => ({
+        playerId: p.id,
+        playerName: p.name,
+        mitgehen: klopf.responses.has(p.id) ? klopf.responses.get(p.id)! : null,
+      }));
   }
 
-  // Record a player's response to the klopf
-  respond(playerId: string, mitgehen: boolean, mustMitgehen: boolean): string | null {
-    if (!this.active) {
-      return KlopfErrors.NOT_IN_KLOPF;
-    }
-
-    if (this.responses.has(playerId)) {
-      return KlopfErrors.ALREADY_RESPONDED;
-    }
-
-    if (mustMitgehen && !mitgehen) {
-      return KlopfErrors.MUST_MITGEHEN;
-    }
-
-    this.responses.set(playerId, mitgehen);
-
-    if (mitgehen) {
-      this.participants.push(playerId);
-    }
-
-    return null;
-  }
-
-  // Check if all players have responded
-  allResponded(playerIds: string[]): boolean {
-    for (const id of playerIds) {
-      if (id === this.initiator) continue; // Initiator doesn't need to respond
-      if (!this.responses.has(id)) return false;
-    }
-    return true;
-  }
-
-  // Get the life penalty for losing this klopf
-  getPenalty(): number {
-    return 1 + this.level;
-  }
-
-  // Check if a player is participating in the klopf
-  isParticipant(playerId: string): boolean {
-    return this.participants.includes(playerId);
-  }
-
-  // Convert to KlopfStateInfo for broadcasting
-  toKlopfStateInfo(): KlopfStateInfo {
-    return {
-      active: this.active,
-      initiator: this.initiator,
-      level: this.level,
-      participants: [...this.participants],
-    };
-  }
+  return info;
 }

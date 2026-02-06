@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Card, SUIT_SYMBOLS, SUIT_COLORS } from '../../../core/models';
+import { Card, SUIT_SYMBOLS, SUIT_COLORS } from '@klopf/shared';
 
 @Component({
   selector: 'app-card',
@@ -8,7 +8,7 @@ import { Card, SUIT_SYMBOLS, SUIT_COLORS } from '../../../core/models';
   imports: [CommonModule],
   template: `
     <div
-      class="card bg-white shadow-lg cursor-pointer transition-all duration-200 hover:shadow-xl"
+      class="card bg-base-100 border border-base-300 shadow-lg cursor-pointer transition-all duration-200 hover:shadow-xl"
       [class.opacity-50]="disabled"
       [class.ring-2]="selected"
       [class.ring-primary]="selected"
@@ -16,10 +16,10 @@ import { Card, SUIT_SYMBOLS, SUIT_COLORS } from '../../../core/models';
       (click)="onCardClick()"
     >
       <div class="card-body p-2 items-center justify-center min-w-[60px] min-h-[90px]">
-        <span class="text-2xl font-bold" [ngClass]="getSuitColor()">
+        <span class="text-2xl font-bold" [style.color]="getSuitColor()">
           {{ card.rank }}
         </span>
-        <span class="text-3xl" [ngClass]="getSuitColor()">
+        <span class="text-3xl" [style.color]="getSuitColor()">
           {{ getSuitSymbol() }}
         </span>
       </div>

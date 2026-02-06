@@ -1,62 +1,44 @@
-import type { Card, Suit, TrickCard, Trick as TrickInfo } from '@klopf/shared';
+import type { Card, Suit, Trick as TrickInfo } from '@klopf/shared';
+import type { TrickState } from './types.js';
 import { cardBeats } from './card.js';
 
-export class Trick {
-  cards: TrickCard[];
-  leadSuit: Suit | '' = '';
-  winnerId: string | undefined;
+export function createTrick(): TrickState {
+  return { cards: [], leadSuit: '', winnerId: undefined };
+}
 
-  constructor() {
-    this.cards = [];
+export function addCardToTrick(trick: TrickState, playerId: string, card: Card): void {
+  if (trick.cards.length === 0) {
+    trick.leadSuit = card.suit;
   }
+  trick.cards.push({ playerId, card });
+}
 
-  // Add a card to the trick
-  addCard(playerId: string, card: Card): void {
-    // First card determines the lead suit
-    if (this.cards.length === 0) {
-      this.leadSuit = card.suit;
+export function isTrickComplete(trick: TrickState, numPlayers: number): boolean {
+  return trick.cards.length >= numPlayers;
+}
+
+export function determineTrickWinner(trick: TrickState): string {
+  if (trick.cards.length === 0) return '';
+
+  let winningIdx = 0;
+  let winningCard = trick.cards[0].card;
+
+  for (let i = 1; i < trick.cards.length; i++) {
+    const currentCard = trick.cards[i].card;
+    if (cardBeats(currentCard, winningCard, trick.leadSuit as Suit)) {
+      winningIdx = i;
+      winningCard = currentCard;
     }
-
-    this.cards.push({ playerId, card });
   }
 
-  // Check if trick is complete (all players have played)
-  isComplete(numPlayers: number): boolean {
-    return this.cards.length >= numPlayers;
-  }
+  trick.winnerId = trick.cards[winningIdx].playerId;
+  return trick.winnerId;
+}
 
-  // Determine the winner of the trick
-  determineWinner(): string {
-    if (this.cards.length === 0) return '';
-
-    let winningIdx = 0;
-    let winningCard = this.cards[0].card;
-
-    for (let i = 1; i < this.cards.length; i++) {
-      const currentCard = this.cards[i].card;
-      // A card beats the current winner if it's the same suit with higher value
-      // or if it matches the lead suit and the current winner doesn't
-      if (cardBeats(currentCard, winningCard, this.leadSuit as Suit)) {
-        winningIdx = i;
-        winningCard = currentCard;
-      }
-    }
-
-    this.winnerId = this.cards[winningIdx].playerId;
-    return this.winnerId;
-  }
-
-  // Get lead suit
-  getLeadSuit(): Suit {
-    return this.leadSuit as Suit;
-  }
-
-  // Convert to TrickInfo for broadcasting
-  toTrickInfo(): TrickInfo {
-    return {
-      cards: this.cards,
-      leadSuit: this.leadSuit,
-      winnerId: this.winnerId,
-    };
-  }
+export function toTrickInfo(trick: TrickState): TrickInfo {
+  return {
+    cards: trick.cards,
+    leadSuit: trick.leadSuit,
+    winnerId: trick.winnerId,
+  };
 }

@@ -1,61 +1,47 @@
 import type { Card, Suit, Player as PlayerInfo } from '@klopf/shared';
 import { INITIAL_LIVES } from '@klopf/shared';
+import type { PlayerState } from './types.js';
 
-// Internal player state (includes private data like hand and connection)
-export class Player {
-  readonly id: string;
-  name: string;
-  lives: number;
-  hand: Card[];
-  connected: boolean;
-  mustMitgehen: boolean; // Player with 1 life must always mitgehen
-  hasSeenCards: boolean; // For Blind auf 3
+export function createPlayer(id: string, name: string): PlayerState {
+  return {
+    id,
+    name,
+    lives: INITIAL_LIVES,
+    hand: [],
+    connected: true,
+    mustMitgehen: false,
+    hasSeenCards: true,
+  };
+}
 
-  constructor(id: string, name: string) {
-    this.id = id;
-    this.name = name;
-    this.lives = INITIAL_LIVES;
-    this.hand = [];
-    this.connected = true;
-    this.mustMitgehen = false;
-    this.hasSeenCards = true;
-  }
+export function hasCard(player: PlayerState, cardId: string): boolean {
+  return player.hand.some((c) => c.id === cardId);
+}
 
-  // Check if player has a specific card
-  hasCard(cardId: string): boolean {
-    return this.hand.some((c) => c.id === cardId);
-  }
+export function removeCard(player: PlayerState, cardId: string): Card | undefined {
+  const index = player.hand.findIndex((c) => c.id === cardId);
+  if (index === -1) return undefined;
+  return player.hand.splice(index, 1)[0];
+}
 
-  // Remove and return a card from hand
-  removeCard(cardId: string): Card | undefined {
-    const index = this.hand.findIndex((c) => c.id === cardId);
-    if (index === -1) return undefined;
-    return this.hand.splice(index, 1)[0];
-  }
+export function getCardsOfSuit(player: PlayerState, suit: Suit): Card[] {
+  return player.hand.filter((c) => c.suit === suit);
+}
 
-  // Get all cards of a specific suit
-  getCardsOfSuit(suit: Suit): Card[] {
-    return this.hand.filter((c) => c.suit === suit);
-  }
+export function isAlive(player: PlayerState): boolean {
+  return player.lives > 0;
+}
 
-  // Check if player is still alive
-  isAlive(): boolean {
-    return this.lives > 0;
-  }
+export function loseLives(player: PlayerState, n: number): void {
+  player.lives = Math.max(0, player.lives - n);
+}
 
-  // Lose lives (minimum 0)
-  loseLives(n: number): void {
-    this.lives = Math.max(0, this.lives - n);
-  }
-
-  // Get public player info (for broadcasting)
-  toPlayerInfo(): PlayerInfo {
-    return {
-      id: this.id,
-      name: this.name,
-      lives: this.lives,
-      cardCount: this.hand.length,
-      connected: this.connected,
-    };
-  }
+export function toPlayerInfo(player: PlayerState): PlayerInfo {
+  return {
+    id: player.id,
+    name: player.name,
+    lives: player.lives,
+    cardCount: player.hand.length,
+    connected: player.connected,
+  };
 }

@@ -1,6 +1,6 @@
 import { Injectable, computed, signal, inject } from '@angular/core';
 import { WebsocketService, ServerMessage } from './websocket.service';
-import { Card, GameStateInfo, Player, RoundResult, GameState } from '../models';
+import { Card, GameStateInfo, Player, RoundResult, GameState } from '@klopf/shared';
 import { LoggerService } from './logger.service';
 
 @Injectable({
