@@ -93,6 +93,17 @@ export class GameStateService {
           currentPlayerId: msg.state.currentPlayerId,
           trickCards: msg.state.currentTrick?.cards?.length || 0
         });
+        // Derive klopf state on reconnect
+        if (msg.state.state === 'klopf_pending' && msg.state.klopf) {
+          const myId = this._playerId();
+          const klopf = msg.state.klopf;
+          if (myId && klopf.initiator !== myId) {
+            const myResponse = klopf.responses?.find(r => r.playerId === myId);
+            if (!myResponse || myResponse.mitgehen === null) {
+              this._klopfResponseNeeded.set(true);
+            }
+          }
+        }
         break;
       }
 

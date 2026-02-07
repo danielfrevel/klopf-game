@@ -6,6 +6,8 @@ import { isAlive } from '../../game/player.js';
 import { getPlayerId, getPlayerRoom } from '../connections.js';
 import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
 import { getPlayerWs } from '../connections.js';
+import { broadcastGameOver, handleRoundEnd } from './game.js';
+import { log } from '../../utils/logger.js';
 
 export function handleKlopf(ws: ServerWebSocket<WsData>): void {
   const playerId = getPlayerId(ws);
@@ -40,6 +42,24 @@ export function handleKlopfResponse(ws: ServerWebSocket<WsData>, mitgehen: boole
 
   const err = respondToGameKlopf(room.game, playerId, mitgehen);
   if (err) { sendError(ws, err); return; }
+
+  if (room.game.state === 'game_over') {
+    log.klopf.info('Game over after klopf response');
+    broadcastGameOver(room);
+    return;
+  }
+
+  // "all declined" → endRound was called, state is round_end/dealing/klopf_pending/game_over
+  if (room.game.state === 'round_end' || room.game.state === 'dealing' || room.game.state === 'klopf_pending') {
+    log.klopf.info('All declined klopf, round ended automatically');
+    handleRoundEnd(room);
+    if (room.game.state === 'game_over') {
+      broadcastGameOver(room);
+      return;
+    }
+    broadcastGameState(room);
+    return;
+  }
 
   if (room.game.state === 'playing') {
     broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });

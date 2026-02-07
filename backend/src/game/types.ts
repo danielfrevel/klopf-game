@@ -40,6 +40,7 @@ export interface GameData {
   redealResponses: Map<string, boolean>;
   turnTimer: ReturnType<typeof setTimeout> | null;
   onTimeout?: (playerId: string) => void;
+  lastRoundResults?: { winnerId: string; results: import('@klopf/shared').RoundResult[] };
 }
 
 export interface RoomData {

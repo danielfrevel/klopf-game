@@ -1,11 +1,12 @@
 import type { ServerWebSocket } from 'bun';
 import type { WsData } from '../handler.js';
 import { createRoom, getRoom, removeRoom, isOwner } from '../../game/room.js';
-import { createPlayer } from '../../game/player.js';
-import { addPlayer, getPlayer, toGameStateInfo } from '../../game/game.js';
+import { createPlayer, isAlive } from '../../game/player.js';
+import { addPlayer, getPlayer, getCurrentPlayerId, toGameStateInfo } from '../../game/game.js';
 import { registerConnection, getPlayerId, getPlayerRoom, removePlayerRoom } from '../connections.js';
 import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
 import { toPlayerInfo } from '../../game/player.js';
+import { log } from '../../utils/logger.js';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -66,6 +67,7 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
 
   player.connected = true;
   registerConnection(ws, playerId, roomCode);
+  log.room.info(`Player ${player.name} reconnected to room ${roomCode} (state: ${room.game.state})`);
 
   send(ws, { type: 'room_created', roomCode: room.code, playerId });
   send(ws, { type: 'game_state', state: toGameStateInfo(room.game) });
@@ -73,6 +75,21 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
   if (room.game.state !== 'lobby') {
     send(ws, { type: 'cards_dealt', cards: player.hand });
   }
+
+  if (room.game.state === 'klopf_pending') {
+    const klopf = room.game.klopf;
+    if (player.id !== klopf.initiator && isAlive(player) && !klopf.responses.has(player.id)) {
+      send(ws, { type: 'klopf_response_needed', level: klopf.level });
+    }
+  }
+
+  if (room.game.state === 'redeal_pending') {
+    if (player.id !== room.game.redealRequester && !room.game.redealResponses.has(player.id)) {
+      send(ws, { type: 'redeal_response_needed', redealCount: room.game.redealCount, maxRedeals: 3 });
+    }
+  }
+
+  broadcastToRoom(room, { type: 'player_joined', player: toPlayerInfo(player) });
 }
 
 export function handleCloseRoom(ws: ServerWebSocket<WsData>): void {

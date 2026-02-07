@@ -8,7 +8,7 @@ import { Card, SUIT_SYMBOLS, SUIT_COLORS } from '@klopf/shared';
   imports: [CommonModule],
   template: `
     <div
-      class="card bg-base-100 border border-base-300 shadow-lg cursor-pointer transition-all duration-200 hover:shadow-xl"
+      class="card bg-white border border-gray-300 shadow-lg cursor-pointer transition-all duration-200 hover:shadow-xl"
       [class.opacity-50]="disabled"
       [class.ring-2]="selected"
       [class.ring-primary]="selected"

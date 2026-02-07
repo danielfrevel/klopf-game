@@ -11,6 +11,7 @@ import {
 import { isAlive } from '../../game/player.js';
 import { getPlayerId, getPlayerRoom, getPlayerWs } from '../connections.js';
 import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { log } from '../../utils/logger.js';
 
 export function handleStartGame(ws: ServerWebSocket<WsData>): void {
   const playerId = getPlayerId(ws);
@@ -64,6 +65,8 @@ export function processCardPlayed(room: RoomData, playerId: string, playedCard: 
   if (
     room.game.state === 'trick_complete' ||
     room.game.state === 'round_end' ||
+    room.game.state === 'dealing' ||
+    room.game.state === 'klopf_pending' ||
     room.game.state === 'game_over'
   ) {
     const lastTrick = room.game.completedTricks.at(-1);
@@ -72,29 +75,40 @@ export function processCardPlayed(room: RoomData, playerId: string, playedCard: 
     }
   }
 
-  if (room.game.state === 'round_end' || room.game.state === 'dealing') {
+  if (room.game.state === 'game_over') {
+    broadcastGameOver(room);
+    return;
+  }
+
+  if (room.game.state === 'round_end' || room.game.state === 'dealing' || room.game.state === 'klopf_pending') {
     handleRoundEnd(room);
   }
 
   if (room.game.state === 'game_over') {
-    const winner = getWinner(room.game);
-    if (winner) {
-      const perfectWin = winner.lives === INITIAL_LIVES;
-      const playerCount = room.game.players.length;
-      let winnings = (playerCount - 1) * room.game.stakes;
-      if (perfectWin) winnings *= 2;
-
-      broadcastToRoom(room, {
-        type: 'game_over',
-        winnerId: winner.id,
-        perfectWin,
-        stakes: room.game.stakes,
-        winnings,
-      });
-    }
+    broadcastGameOver(room);
     return;
   }
 
+  broadcastGameState(room);
+}
+
+export function broadcastGameOver(room: RoomData): void {
+  const winner = getWinner(room.game);
+  if (winner) {
+    const perfectWin = winner.lives === INITIAL_LIVES;
+    const playerCount = room.game.players.length;
+    let winnings = (playerCount - 1) * room.game.stakes;
+    if (perfectWin) winnings *= 2;
+
+    log.game.info(`Game over! Winner: ${winner.name}, winnings: ${winnings}`);
+    broadcastToRoom(room, {
+      type: 'game_over',
+      winnerId: winner.id,
+      perfectWin,
+      stakes: room.game.stakes,
+      winnings,
+    });
+  }
   broadcastGameState(room);
 }
 
@@ -116,8 +130,9 @@ export function handlePlayCard(ws: ServerWebSocket<WsData>, cardId: string): voi
   processCardPlayed(room, playerId, playedCard);
 }
 
-function handleRoundEnd(room: RoomData): void {
-  const results: RoundResult[] = room.game.players.map((p) => ({
+export function handleRoundEnd(room: RoomData): void {
+  const roundResult = room.game.lastRoundResults;
+  const results: RoundResult[] = roundResult?.results ?? room.game.players.map((p) => ({
     playerId: p.id,
     playerName: p.name,
     livesLost: 0,
@@ -126,15 +141,32 @@ function handleRoundEnd(room: RoomData): void {
   }));
 
   broadcastToRoom(room, { type: 'round_ended', results });
+  room.game.lastRoundResults = undefined;
 
-  if (room.game.state === 'dealing') {
+  if (room.game.state === 'dealing' || room.game.state === 'klopf_pending') {
     for (const player of room.game.players) {
       if (isAlive(player)) {
         const pws = getPlayerWs(player.id);
         if (pws) send(pws, { type: 'cards_dealt', cards: player.hand });
       }
     }
-    startPlaying(room.game);
+
+    if (room.game.state === 'klopf_pending') {
+      log.game.info('New round has auto-klopf, broadcasting klopf_initiated');
+      broadcastToRoom(room, {
+        type: 'klopf_initiated',
+        playerId: room.game.klopf.initiator,
+        level: room.game.klopf.level,
+      });
+      for (const player of room.game.players) {
+        if (player.id !== room.game.klopf.initiator && isAlive(player)) {
+          const pws = getPlayerWs(player.id);
+          if (pws) send(pws, { type: 'klopf_response_needed', level: room.game.klopf.level });
+        }
+      }
+    } else {
+      startPlaying(room.game);
+    }
   }
 }
 

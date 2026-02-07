@@ -16,6 +16,12 @@ import {
   respondKlopf, allKlopfResponded, getKlopfPenalty, isKlopfParticipant,
   toKlopfStateInfo, KlopfErrors,
 } from './klopf.js';
+import { log } from '../utils/logger.js';
+
+export interface EndRoundResult {
+  winnerId: string;
+  results: RoundResult[];
+}
 
 export const GameErrors = {
   NOT_ENOUGH_PLAYERS: 'Not enough players',
@@ -49,6 +55,7 @@ export function createGame(): GameData {
     redealResponses: new Map(),
     turnTimer: null,
     onTimeout: undefined,
+    lastRoundResults: undefined,
   };
 }
 
@@ -87,6 +94,7 @@ export function startGame(game: GameData): string | null {
 }
 
 function startRound(game: GameData): void {
+  log.game.info(`Starting round ${game.roundNumber + 1}`);
   game.roundNumber++;
   game.trickNumber = 0;
   game.completedTricks = [];
@@ -171,11 +179,25 @@ export function respondToGameKlopf(game: GameData, playerId: string, mitgehen: b
   if (err) return err;
 
   if (!mitgehen) {
-    loseLives(player, 1);
+    const penalty = getKlopfPenalty(game.klopf);
+    loseLives(player, penalty);
+    log.klopf.info(`${player.name} declined klopf, lost ${penalty} lives (${player.lives} left)`);
+
+    if (countAlivePlayers(game) <= 1) {
+      game.state = 'game_over';
+      return null;
+    }
   }
 
   const aliveIds = game.players.filter((p) => isAlive(p)).map((p) => p.id);
   if (allKlopfResponded(game.klopf, aliveIds)) {
+    const allDeclined = game.klopf.participants.length === 1;
+    if (allDeclined) {
+      log.klopf.info('All players declined klopf, initiator wins automatically');
+      const result = endRound(game, game.klopf.initiator);
+      game.lastRoundResults = result;
+      return null;
+    }
     game.state = 'playing';
     startPlayerTimer(game);
   }
@@ -245,8 +267,11 @@ function completeTrick(game: GameData): void {
   game.state = 'trick_complete';
   game.completedTricks.push(game.currentTrick);
 
+  log.game.info(`Trick ${game.trickNumber} complete, winner: ${winnerId}`);
+
   if (game.trickNumber >= TRICKS_PER_ROUND) {
-    endRound(game, winnerId);
+    const result = endRound(game, winnerId);
+    game.lastRoundResults = result;
   } else {
     const winnerIndex = game.players.findIndex((p) => p.id === winnerId);
     if (winnerIndex !== -1) game.currentPlayerIndex = winnerIndex;
@@ -258,26 +283,35 @@ function completeTrick(game: GameData): void {
   }
 }
 
-function endRound(game: GameData, loserId: string): void {
+function endRound(game: GameData, winnerId: string): EndRoundResult {
   game.state = 'round_end';
 
-  const loser = getPlayer(game, loserId);
-  if (!loser) return;
+  const results: RoundResult[] = [];
+  const alivePlayers = game.players.filter(p => isAlive(p));
 
-  let penalty = 1;
-  if (game.klopf.active && isKlopfParticipant(game.klopf, loserId)) {
-    penalty = getKlopfPenalty(game.klopf);
+  for (const player of alivePlayers) {
+    if (player.id === winnerId) {
+      results.push({ playerId: player.id, playerName: player.name, livesLost: 0, livesLeft: player.lives, isLoser: false });
+      continue;
+    }
+    let penalty = 1;
+    if (game.klopf.active && isKlopfParticipant(game.klopf, player.id)) {
+      penalty = getKlopfPenalty(game.klopf);
+    }
+    loseLives(player, penalty);
+    results.push({ playerId: player.id, playerName: player.name, livesLost: penalty, livesLeft: player.lives, isLoser: true });
+    log.game.info(`${player.name} lost ${penalty} lives (${player.lives} left)`);
   }
 
-  loseLives(loser, penalty);
+  log.game.info(`Round ${game.roundNumber} ended, winner: ${winnerId}`, { results });
 
-  const aliveCount = countAlivePlayers(game);
-  if (aliveCount <= 1) {
+  if (countAlivePlayers(game) <= 1) {
     game.state = 'game_over';
-    return;
+    return { winnerId, results };
   }
 
   startRound(game);
+  return { winnerId, results };
 }
 
 function advanceToNextPlayer(game: GameData): void {
@@ -382,6 +416,11 @@ function startPlayerTimer(game: GameData): void {
   cancelPlayerTimer(game);
 
   game.turnTimer = setTimeout(() => {
+    if (game.state !== 'playing') {
+      log.game.warn(`Timer fired but state is ${game.state}, ignoring`);
+      return;
+    }
+    log.game.info(`Timer expired for ${currentPlayer.name}, playing random card`);
     if (game.onTimeout) {
       game.onTimeout(currentPlayer.id);
     } else {

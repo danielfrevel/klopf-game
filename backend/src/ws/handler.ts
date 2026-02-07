@@ -9,6 +9,7 @@ import { handleCreateRoom, handleJoinRoom, handleReconnect, handleCloseRoom } fr
 import { handleStartGame, handlePlayCard, handleSetStakes } from './handlers/game.js';
 import { handleKlopf, handleKlopfResponse, handleBlindDrei } from './handlers/klopf.js';
 import { handleRequestRedeal, handleRedealResponse } from './handlers/redeal.js';
+import { log } from '../utils/logger.js';
 
 export interface WsData {
   connId: number;
@@ -17,6 +18,7 @@ export interface WsData {
 }
 
 function handleMessage(ws: ServerWebSocket<WsData>, message: ClientMessage): void {
+  log.ws.debug(`Message: ${message.type}`, message);
   switch (message.type) {
     case 'create_room':    handleCreateRoom(ws, message.playerName); break;
     case 'join_room':      handleJoinRoom(ws, message.roomCode, message.playerName); break;

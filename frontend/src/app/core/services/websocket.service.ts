@@ -18,8 +18,10 @@ export class WebsocketService implements OnDestroy {
   private messages$ = new Subject<ServerMessage>();
 
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 30;
   private reconnectDelay = 1000;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private reconnecting = false;
 
   get isConnected$(): Observable<boolean> {
     return this.connectionStatus$.asObservable();
@@ -42,14 +44,18 @@ export class WebsocketService implements OnDestroy {
       this.logger.info('WS', 'WebSocket connected');
       this.connectionStatus$.next(true);
       this.reconnectAttempts = 0;
+      this.startHeartbeat();
 
-      // Try to reconnect to existing game
-      this.tryReconnect();
+      if (this.reconnecting) {
+        this.reconnecting = false;
+        this.tryReconnect();
+      }
     };
 
     this.socket.onclose = (event) => {
       this.logger.warn('WS', 'WebSocket disconnected', { code: event.code, reason: event.reason });
       this.connectionStatus$.next(false);
+      this.stopHeartbeat();
       this.attemptReconnect();
     };
 
@@ -131,10 +137,17 @@ export class WebsocketService implements OnDestroy {
   }
 
   private handleMessage(message: ServerMessage): void {
-    // Store session info for reconnect
     if (message.type === 'room_created') {
       sessionStorage.setItem('klopf_room', message.roomCode);
       sessionStorage.setItem('klopf_player', message.playerId);
+    }
+    if (message.type === 'error' && message.error === 'Room not found') {
+      sessionStorage.removeItem('klopf_room');
+      sessionStorage.removeItem('klopf_player');
+    }
+    if (message.type === 'room_closed') {
+      sessionStorage.removeItem('klopf_room');
+      sessionStorage.removeItem('klopf_player');
     }
   }
 
@@ -148,15 +161,36 @@ export class WebsocketService implements OnDestroy {
   }
 
   private attemptReconnect(): void {
+    const hasSession = sessionStorage.getItem('klopf_room') && sessionStorage.getItem('klopf_player');
+    if (!hasSession) return;
+
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      const delay = this.reconnectDelay * this.reconnectAttempts;
-      console.log(`Attempting reconnect in ${delay}ms...`);
+      const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), 30000);
+      this.logger.info('WS', `Reconnect attempt ${this.reconnectAttempts} in ${Math.round(delay)}ms`);
+      this.reconnecting = true;
       setTimeout(() => this.connect(), delay);
     }
   }
 
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send('ping');
+      }
+    }, 30000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
   ngOnDestroy(): void {
+    this.stopHeartbeat();
     this.disconnect();
   }
 }
