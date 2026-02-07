@@ -52,6 +52,7 @@ export function handleKlopfResponse(ws: ServerWebSocket<WsData>, mitgehen: boole
   // "all declined" → endRound was called, state is round_end/dealing/klopf_pending/game_over
   if (room.game.state === 'round_end' || room.game.state === 'dealing' || room.game.state === 'klopf_pending') {
     log.klopf.info('All declined klopf, round ended automatically');
+    broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
     handleRoundEnd(room);
     if (room.game.state === 'game_over') {
       broadcastGameOver(room);

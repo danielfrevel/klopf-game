@@ -20,8 +20,6 @@ export class WebsocketService implements OnDestroy {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 30;
   private reconnectDelay = 1000;
-  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-  private reconnecting = false;
 
   get isConnected$(): Observable<boolean> {
     return this.connectionStatus$.asObservable();
@@ -44,18 +42,12 @@ export class WebsocketService implements OnDestroy {
       this.logger.info('WS', 'WebSocket connected');
       this.connectionStatus$.next(true);
       this.reconnectAttempts = 0;
-      this.startHeartbeat();
-
-      if (this.reconnecting) {
-        this.reconnecting = false;
-        this.tryReconnect();
-      }
+      this.tryReconnect();
     };
 
     this.socket.onclose = (event) => {
       this.logger.warn('WS', 'WebSocket disconnected', { code: event.code, reason: event.reason });
       this.connectionStatus$.next(false);
-      this.stopHeartbeat();
       this.attemptReconnect();
     };
 
@@ -168,29 +160,11 @@ export class WebsocketService implements OnDestroy {
       this.reconnectAttempts++;
       const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), 30000);
       this.logger.info('WS', `Reconnect attempt ${this.reconnectAttempts} in ${Math.round(delay)}ms`);
-      this.reconnecting = true;
       setTimeout(() => this.connect(), delay);
     }
   }
 
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.heartbeatInterval = setInterval(() => {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        this.socket.send('ping');
-      }
-    }, 30000);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-  }
-
   ngOnDestroy(): void {
-    this.stopHeartbeat();
     this.disconnect();
   }
 }

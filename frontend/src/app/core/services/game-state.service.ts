@@ -93,6 +93,9 @@ export class GameStateService {
           currentPlayerId: msg.state.currentPlayerId,
           trickCards: msg.state.currentTrick?.cards?.length || 0
         });
+        if (msg.state.state !== 'klopf_pending') {
+          this._klopfResponseNeeded.set(false);
+        }
         // Derive klopf state on reconnect
         if (msg.state.state === 'klopf_pending' && msg.state.klopf) {
           const myId = this._playerId();
