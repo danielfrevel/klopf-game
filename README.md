@@ -8,13 +8,16 @@ Ein Multiplayer-Kartenspiel mit WebSocket-Unterstützung.
 - Rang (hoch zu niedrig): 10 > 9 > 8 > 7 > Bube > Dame > König > Ass
 - Jeder Spieler startet mit 7 Leben und erhält 4 Karten pro Runde
 - Erste Karte bestimmt die Stich-Farbe, höchste Karte gewinnt
-- Verlierer einer Runde verliert 1 Leben
+- **Gewinner des letzten Stichs gewinnt die Runde**
+- **Alle anderen Spieler (Verlierer) verlieren 1 Leben**
 
 ### Klopfen
 
 - Jederzeit möglich, unterbricht das Spiel
-- Andere Spieler können mitgehen oder sofort 1 Leben verlieren
-- Bei Niederlage verlieren Mitgehende: 1 + Klopf-Stufe Leben
+- Andere Spieler können **mitgehen** oder **ablehnen**
+- **Ablehnung**: Spieler verliert sofort 1 + Klopf-Stufe Leben (wie Stich verloren)
+- **Mitgehen + Niederlage**: Verlierer verlieren 1 + Klopf-Stufe Leben
+- **Alle lehnen ab**: Klopfer gewinnt automatisch, Runde sofort vorbei
 - Konter-Klopfen erhöht die Stufe
 - Nicht zweimal hintereinander vom selben Spieler möglich
 
@@ -117,6 +120,8 @@ klopf-game/
 │       │   ├── klopf.ts        # Klopf-Logik
 │       │   ├── game.ts         # Haupt-Spiellogik
 │       │   └── room.ts         # Raum-Verwaltung
+│       ├── utils/
+│       │   └── logger.ts       # Structured Logging ([Game], [WS], [Klopf], [Room])
 │       └── ws/                 # WebSocket-Handler
 │           ├── handler.ts      # Router (Elysia WS setup)
 │           ├── connections.ts  # Connection-Tracking
