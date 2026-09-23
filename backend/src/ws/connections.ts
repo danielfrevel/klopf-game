@@ -50,9 +50,10 @@ export function removeConnection(ws: ServerWebSocket<WsData>): { playerId: strin
   if (!data?.playerId) return null;
 
   connectionData.delete(connId);
+  if (playerConns.get(data.playerId)?.connId !== connId) return null;
+
   playerConns.delete(data.playerId);
   playerRooms.delete(data.playerId);
-
   return data;
 }
 

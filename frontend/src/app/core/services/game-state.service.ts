@@ -1,4 +1,6 @@
 import { Injectable, computed, signal, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { interval, map } from 'rxjs';
 import { WebsocketService, ServerMessage } from './websocket.service';
 import { Card, GameStateInfo, Player, RoundResult, GameState } from '@klopf/shared';
 import { LoggerService } from './logger.service';
@@ -38,6 +40,14 @@ export class GameStateService {
   readonly perfectWin = this._perfectWin.asReadonly();
   readonly winnings = this._winnings.asReadonly();
   readonly error = this._error.asReadonly();
+
+  private readonly now = toSignal(interval(1000).pipe(map(() => Date.now())), { initialValue: Date.now() });
+  readonly phaseEndsAt = computed(() => this._gameState()?.phaseEndsAt ?? null);
+  readonly phaseSecondsLeft = computed(() => {
+    const endsAt = this.phaseEndsAt();
+    if (endsAt === null) return null;
+    return Math.max(0, Math.ceil((endsAt - this.now()) / 1000));
+  });
 
   // Computed values
   readonly isInGame = computed(() => this._gameState()?.state !== 'lobby');
@@ -93,20 +103,8 @@ export class GameStateService {
           currentPlayerId: msg.state.currentPlayerId,
           trickCards: msg.state.currentTrick?.cards?.length || 0
         });
-        if (msg.state.state !== 'klopf_pending') {
-          this._klopfResponseNeeded.set(false);
-        }
-        // Derive klopf state on reconnect
-        if (msg.state.state === 'klopf_pending' && msg.state.klopf) {
-          const myId = this._playerId();
-          const klopf = msg.state.klopf;
-          if (myId && klopf.initiator !== myId) {
-            const myResponse = klopf.responses?.find(r => r.playerId === myId);
-            if (!myResponse || myResponse.mitgehen === null) {
-              this._klopfResponseNeeded.set(true);
-            }
-          }
-        }
+        const myResponse = msg.state.klopf.responses?.find(r => r.playerId === this._playerId());
+        this._klopfResponseNeeded.set(msg.state.state === 'klopf_pending' && myResponse?.mitgehen === null);
         break;
       }
 
@@ -136,7 +134,6 @@ export class GameStateService {
         break;
 
       case 'klopf_initiated':
-        this._klopfResponseNeeded.set(msg.playerId !== this._playerId());
         this.logger.info('GameState', 'Klopf initiated', { initiator: msg.playerId });
         break;
 
@@ -151,12 +148,12 @@ export class GameStateService {
         break;
 
       case 'redeal_requested':
+        this._redealRequesterName.set(this._gameState()?.players.find(p => p.id === msg.playerId)?.name ?? null);
         this.logger.info('GameState', 'Redeal requested', { playerId: msg.playerId });
         break;
 
       case 'redeal_response_needed':
         this._redealResponseNeeded.set(true);
-        // Note: requester name should be fetched from game state
         this.logger.info('GameState', 'Redeal response needed', { redealCount: msg.redealCount, maxRedeals: msg.maxRedeals });
         break;
 

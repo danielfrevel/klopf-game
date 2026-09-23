@@ -57,7 +57,13 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
                 </div>
               </div>
               <div class="mt-2 text-center text-sm text-base-content/70">
-                {{ player.cardCount }} Karten
+                @if (player.lives === 0) {
+                  <span class="badge badge-ghost badge-sm">Ausgeschieden</span>
+                } @else if (player.folded) {
+                  <span class="badge badge-error badge-sm">ausgestiegen</span>
+                } @else {
+                  {{ player.cardCount }} Karten
+                }
               </div>
             </div>
           }
@@ -83,14 +89,34 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
 
         <!-- Current Turn Indicator -->
         <div class="text-center">
-          @if (gameState.isMyTurn()) {
-            <p class="text-lg font-bold text-primary animate-pulse">Du bist dran!</p>
-          } @else if (currentPlayerName()) {
-            <p class="text-base-content/70">{{ currentPlayerName() }} ist am Zug...</p>
+          @if (gameState.gameState()?.state === 'playing') {
+            @if (gameState.isMyTurn()) {
+              <p class="text-lg font-bold text-primary animate-pulse">Du bist dran! ({{ gameState.phaseSecondsLeft() }} s)</p>
+            } @else if (currentPlayerName()) {
+              <p class="text-base-content/70">{{ currentPlayerName() }} ist am Zug ({{ gameState.phaseSecondsLeft() }} s)</p>
+            }
           }
         </div>
 
-        <!-- Action Buttons -->
+        @if (gameState.gameState()?.state === 'dealing') {
+          <div class="card bg-base-100 shadow-sm p-4 max-w-2xl mx-auto w-full text-center">
+            <p class="font-bold">Austeilphase: noch {{ gameState.phaseSecondsLeft() }} s</p>
+            <ul class="flex flex-wrap justify-center gap-2 mt-2">
+              @for (player of activePlayers(); track player.id) {
+                <li class="badge" [class.badge-success]="player.revealed" [class.badge-ghost]="!player.revealed">
+                  {{ player.name }}: {{ player.revealed ? 'aufgedeckt' : 'verdeckt' }}
+                </li>
+              }
+            </ul>
+            @if (!gameState.me()?.revealed && isActive()) {
+              <div class="flex justify-center gap-4 mt-4">
+                <button class="btn btn-primary" (click)="revealCards()">Aufdecken</button>
+                <button class="btn btn-warning" (click)="blindDrei()">Blind auf 3</button>
+              </div>
+            }
+          </div>
+        }
+
         <div class="flex justify-center gap-4">
           @if (canKlopf()) {
             <button class="btn btn-warning btn-lg" [disabled]="klopfPending()" (click)="klopf()">
@@ -133,6 +159,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           </div>
           <app-player-hand
             [cards]="gameState.myCards()"
+            [faceDown]="gameState.gameState()?.state === 'dealing' && !gameState.me()?.revealed"
             [canPlay]="gameState.isMyTurn()"
             [selectedCardId]="selectedCard()?.id || null"
             (cardSelected)="selectCard($event)"
@@ -167,6 +194,8 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           [initiatorName]="getKlopfInitiatorName()"
           [level]="gameState.gameState()?.klopf?.level || 1"
           [mustMitgehen]="gameState.me()?.lives === 1"
+          [declineCost]="gameState.gameState()?.klopf?.level || 1"
+          [loseCost]="(gameState.gameState()?.klopf?.level || 1) + 1"
           (response)="respondToKlopf($event)"
         />
       }
@@ -181,7 +210,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
               möchte neue Karten austeilen.
             </p>
             <p class="text-sm text-base-content/70 mb-4">
-              Bereits {{ gameState.gameState()?.redealCount || 0 }} von {{ gameState.gameState()?.maxRedeals || 3 }} Neuverteilungen verwendet.
+              Bereits {{ gameState.gameState()?.redealCount || 0 }} von {{ gameState.gameState()?.maxRedeals || 3 }} Einigungen verwendet.
             </p>
             <div class="modal-action">
               <button class="btn btn-error" (click)="respondToRedeal(false)">Ablehnen</button>
@@ -203,7 +232,9 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
                     [class.bg-error/20]="result.isLoser">
                   <span>{{ result.playerName }}</span>
                   <span>
-                    @if (result.livesLost > 0) {
+                    @if (result.folded) {
+                      <span class="text-error">ausgestiegen, -{{ result.livesLost }}</span>
+                    } @else if (result.livesLost > 0) {
                       <span class="text-error">-{{ result.livesLost }}</span>
                     }
                     ({{ result.livesLeft }} Leben)
@@ -305,27 +336,25 @@ export class GameComponent implements OnInit, OnDestroy {
     }
   }
 
+  activePlayers = computed(() => (this.gameState.gameState()?.players ?? []).filter(p => p.lives > 0 && !p.folded));
+
+  isActive(): boolean {
+    const me = this.gameState.me();
+    return !!me && me.lives > 0 && !me.folded;
+  }
+
   canKlopf(): boolean {
     const state = this.gameState.gameState();
-    const klopf = state?.klopf;
-    const myId = this.gameState.playerId();
-    const me = this.gameState.me();
+    if (!state || (state.state !== 'playing' && state.state !== 'dealing')) return false;
+    return this.isActive() && state.klopf.lastKlopper !== this.gameState.playerId();
+  }
 
-    if (!me || state?.state !== 'playing') {
-      return false;
-    }
+  revealCards(): void {
+    this.ws.revealCards();
+  }
 
-    // Check klopf limit: new level cannot exceed player's lives + 1
-    const currentLevel = klopf?.level || 0;
-    const newLevel = currentLevel + 1;
-    if (newLevel > me.lives + 1) {
-      return false;
-    }
-
-    // Can klopf if:
-    // - No active klopf
-    // - Counter-klopf (last klopper is not me)
-    return !klopf?.active || klopf.initiator !== myId;
+  blindDrei(): void {
+    this.ws.blindDrei();
   }
 
   klopf(): void {

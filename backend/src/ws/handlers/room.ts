@@ -91,6 +91,7 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
   }
 
   broadcastToRoom(room, { type: 'player_joined', player: toPlayerInfo(player) });
+  broadcastGameState(room);
 }
 
 export function handleCloseRoom(ws: ServerWebSocket<WsData>): void {

@@ -116,6 +116,10 @@ export class WebsocketService implements OnDestroy {
     this.send({ type: 'blind_drei' });
   }
 
+  revealCards(): void {
+    this.send({ type: 'reveal_cards' });
+  }
+
   setStakes(stakes: number): void {
     this.send({ type: 'set_stakes', stakes });
   }

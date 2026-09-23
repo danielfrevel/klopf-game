@@ -42,6 +42,24 @@ import { GameStateService } from '../../core/services';
             </div>
           }
 
+          @if (gameState.roundResults(); as results) {
+            <div class="divider">Letzte Runde</div>
+            <ul class="space-y-1 mb-4 text-sm">
+              @for (result of results; track result.playerId) {
+                <li class="flex justify-between">
+                  <span>{{ result.playerName }}</span>
+                  @if (result.folded) {
+                    <span class="text-error">ausgestiegen, -{{ result.livesLost }}</span>
+                  } @else if (result.livesLost > 0) {
+                    <span class="text-error">-{{ result.livesLost }}</span>
+                  } @else {
+                    <span>Rundensieg</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+
           <div class="divider">Endstand</div>
 
           <ul class="space-y-2 mb-6">

@@ -19,7 +19,7 @@ import { CommonModule } from '@angular/common';
           <span class="badge badge-warning ml-2">Stufe {{ level }}</span>
         </p>
         <p class="text-sm text-base-content/70 mb-4">
-          Verlust bei Niederlage: <strong>{{ level + 1 }} Leben</strong>
+          Verlust bei Niederlage: <strong>{{ loseCost }} Leben</strong>
         </p>
 
         @if (mustMitgehen) {
@@ -34,7 +34,7 @@ import { CommonModule } from '@angular/common';
         <div class="modal-action">
           @if (!mustMitgehen) {
             <button class="btn btn-error" (click)="onResponse(false)">
-              Nicht mitgehen (-1 Leben)
+              Aussteigen (-{{ declineCost }} Leben)
             </button>
           }
           <button class="btn btn-success" (click)="onResponse(true)">
@@ -50,6 +50,8 @@ export class KlopfDialogComponent {
   @Input() initiatorName = '';
   @Input() level = 1;
   @Input() mustMitgehen = false;
+  @Input() declineCost = 1;
+  @Input() loseCost = 2;
   @Output() response = new EventEmitter<boolean>();
 
   onResponse(mitgehen: boolean): void {
