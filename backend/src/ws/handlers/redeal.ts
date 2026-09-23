@@ -20,6 +20,7 @@ export function handleRequestRedeal(ws: ServerWebSocket<WsData>): void {
   for (const p of activePlayers(room.game)) {
     if (p.id !== playerId) sendToPlayer(p.id, { type: 'redeal_response_needed', redealCount: count, maxRedeals });
   }
+  commitRoom(room);
 }
 
 export function handleRedealResponse(ws: ServerWebSocket<WsData>, agree: boolean): void {
