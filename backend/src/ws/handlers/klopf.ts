@@ -2,89 +2,46 @@ import type { ServerWebSocket } from 'bun';
 import type { WsData } from '../handler.js';
 import { getRoom } from '../../game/room.js';
 import { initiateGameKlopf, respondToGameKlopf, blindDrei } from '../../game/game.js';
-import { isAlive } from '../../game/player.js';
 import { getPlayerId, getPlayerRoom } from '../connections.js';
-import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
-import { getPlayerWs } from '../connections.js';
-import { broadcastGameOver, handleRoundEnd } from './game.js';
-import { log } from '../../utils/logger.js';
+import { sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { finishAction, notifyKlopf } from './game.js';
 
 export function handleKlopf(ws: ServerWebSocket<WsData>): void {
   const playerId = getPlayerId(ws);
-  const roomCode = getPlayerRoom(playerId);
-
-  const room = getRoom(roomCode);
+  const room = getRoom(getPlayerRoom(playerId));
   if (!room) { sendError(ws, 'Room not found'); return; }
 
   const err = initiateGameKlopf(room.game, playerId);
   if (err) { sendError(ws, err); return; }
 
-  broadcastToRoom(room, {
-    type: 'klopf_initiated',
-    playerId,
-    level: room.game.klopf.level,
-  });
-
-  for (const player of room.game.players) {
-    if (player.id !== playerId && isAlive(player)) {
-      const pws = getPlayerWs(player.id);
-      if (pws) send(pws, { type: 'klopf_response_needed', level: room.game.klopf.level });
-    }
-  }
+  notifyKlopf(room);
+  broadcastGameState(room);
 }
 
 export function handleKlopfResponse(ws: ServerWebSocket<WsData>, mitgehen: boolean): void {
   const playerId = getPlayerId(ws);
-  const roomCode = getPlayerRoom(playerId);
-
-  const room = getRoom(roomCode);
+  const room = getRoom(getPlayerRoom(playerId));
   if (!room) { sendError(ws, 'Room not found'); return; }
 
+  const { level } = room.game.klopf;
+  const round = room.game.roundNumber;
   const err = respondToGameKlopf(room.game, playerId, mitgehen);
   if (err) { sendError(ws, err); return; }
 
-  if (room.game.state === 'game_over') {
-    log.klopf.info('Game over after klopf response');
-    broadcastGameOver(room);
-    return;
+  if (room.game.state !== 'klopf_pending' || room.game.roundNumber !== round) {
+    broadcastToRoom(room, { type: 'klopf_resolved', level });
   }
-
-  // "all declined" → endRound was called, state is round_end/dealing/klopf_pending/game_over
-  if (room.game.state === 'round_end' || room.game.state === 'dealing' || room.game.state === 'klopf_pending') {
-    log.klopf.info('All declined klopf, round ended automatically');
-    broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
-    handleRoundEnd(room);
-    if (room.game.state === 'game_over') {
-      broadcastGameOver(room);
-      return;
-    }
-    broadcastGameState(room);
-    return;
-  }
-
-  if (room.game.state === 'playing') {
-    broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
-  }
-
-  broadcastGameState(room);
+  finishAction(room);
 }
 
 export function handleBlindDrei(ws: ServerWebSocket<WsData>): void {
   const playerId = getPlayerId(ws);
-  const roomCode = getPlayerRoom(playerId);
-
-  const room = getRoom(roomCode);
+  const room = getRoom(getPlayerRoom(playerId));
   if (!room) { sendError(ws, 'Room not found'); return; }
 
   const err = blindDrei(room.game, playerId);
   if (err) { sendError(ws, err); return; }
 
-  broadcastToRoom(room, { type: 'klopf_initiated', playerId, level: 3 });
-
-  for (const player of room.game.players) {
-    if (player.id !== playerId && isAlive(player)) {
-      const pws = getPlayerWs(player.id);
-      if (pws) send(pws, { type: 'klopf_response_needed', level: 3 });
-    }
-  }
+  notifyKlopf(room);
+  broadcastGameState(room);
 }

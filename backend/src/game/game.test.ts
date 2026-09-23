@@ -1,14 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { GameErrors, getCurrentPlayerId, playCard, startGame, startPlaying } from './game.js';
-import { card, gameWithPlayers, playTrick, setHands } from './test-helpers.js';
+import { GameErrors, getCurrentPlayerId, playCard } from './game.js';
+import { card, playTrick, setHands, startedGame } from './test-helpers.js';
 import type { GameData } from './types.js';
-
-function startedGame(n: number): GameData {
-  const game = gameWithPlayers(n);
-  expect(startGame(game)).toBeNull();
-  startPlaying(game);
-  return game;
-}
 
 const A_WINS_ALL = [
   [card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')],

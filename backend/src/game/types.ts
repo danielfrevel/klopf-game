@@ -1,4 +1,4 @@
-import type { Card, Suit, GameState } from '@klopf/shared';
+import type { Card, Suit, GameState, RoundResult } from '@klopf/shared';
 
 export interface PlayerState {
   readonly id: string;
@@ -7,7 +7,9 @@ export interface PlayerState {
   hand: Card[];
   connected: boolean;
   mustMitgehen: boolean;
-  hasSeenCards: boolean;
+  folded: boolean;
+  revealed: boolean;
+  roundLivesLost: number;
 }
 
 export interface TrickState {
@@ -44,9 +46,11 @@ export interface GameData {
   redealRequester: string;
   redealResponses: Map<string, boolean>;
   turnTimer: ReturnType<typeof setTimeout> | null;
+  dealingTimer: ReturnType<typeof setTimeout> | null;
+  phaseEndsAt: number | null;
   timeouts: GameTimeouts;
   onTimeout?: (playerId: string) => void;
-  lastRoundResults?: { winnerId: string; results: import('@klopf/shared').RoundResult[] };
+  lastRoundResults?: { winnerId: string; results: RoundResult[] };
 }
 
 export interface RoomData {

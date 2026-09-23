@@ -7,6 +7,8 @@ export const PlayerSchema = Type.Object({
   lives: Type.Number(),
   cardCount: Type.Number(),
   connected: Type.Boolean(),
+  folded: Type.Boolean(),
+  revealed: Type.Boolean(),
 });
 export type Player = Static<typeof PlayerSchema>;
 

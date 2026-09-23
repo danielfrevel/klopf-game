@@ -10,7 +10,9 @@ export function createPlayer(id: string, name: string): PlayerState {
     hand: [],
     connected: true,
     mustMitgehen: false,
-    hasSeenCards: true,
+    folded: false,
+    revealed: false,
+    roundLivesLost: 0,
   };
 }
 
@@ -32,8 +34,15 @@ export function isAlive(player: PlayerState): boolean {
   return player.lives > 0;
 }
 
-export function loseLives(player: PlayerState, n: number): void {
-  player.lives = Math.max(0, player.lives - n);
+export function isActive(player: PlayerState): boolean {
+  return isAlive(player) && !player.folded;
+}
+
+export function loseLives(player: PlayerState, n: number): number {
+  const lost = Math.min(player.lives, n);
+  player.lives -= lost;
+  player.roundLivesLost += lost;
+  return lost;
 }
 
 export function toPlayerInfo(player: PlayerState): PlayerInfo {
@@ -43,5 +52,7 @@ export function toPlayerInfo(player: PlayerState): PlayerInfo {
     lives: player.lives,
     cardCount: player.hand.length,
     connected: player.connected,
+    folded: player.folded,
+    revealed: player.revealed,
   };
 }

@@ -2,7 +2,7 @@ import type { Card, Rank, Suit } from '@klopf/shared';
 import type { GameData, GameTimeouts } from './types.js';
 import { createCard } from './card.js';
 import { createPlayer } from './player.js';
-import { addPlayer, createGame, getCurrentPlayerId, playCard, DEFAULT_TIMEOUTS } from './game.js';
+import { addPlayer, createGame, getCurrentPlayerId, playCard, startGame, startPlaying, DEFAULT_TIMEOUTS } from './game.js';
 
 export const PLAYER_IDS = ['A', 'B', 'C', 'D'] as const;
 
@@ -13,6 +13,20 @@ export function gameWithPlayers(n: number, timeouts: Partial<GameTimeouts> = {})
     if (err) throw new Error(err);
   }
   return game;
+}
+
+export function startedGame(n: number, timeouts: Partial<GameTimeouts> = {}): GameData {
+  const game = gameWithPlayers(n, timeouts);
+  const err = startGame(game);
+  if (err) throw new Error(err);
+  if (game.state === 'dealing') startPlaying(game);
+  return game;
+}
+
+export function player(game: GameData, id: string) {
+  const p = game.players.find((x) => x.id === id);
+  if (!p) throw new Error(`no player ${id}`);
+  return p;
 }
 
 export function card(rank: Rank, suit: Suit): Card {

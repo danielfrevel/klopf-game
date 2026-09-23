@@ -45,6 +45,7 @@ export const KlopfStateSchema = Type.Object({
   level: Type.Number(),
   participants: Type.Array(Type.String()),
   responses: Type.Optional(Type.Array(KlopfResponseSchema)),
+  lastKlopper: Type.String(),
 });
 export type KlopfState = Static<typeof KlopfStateSchema>;
 
@@ -67,7 +68,7 @@ export const GameStateInfoSchema = Type.Object({
   redealCount: Type.Number(),
   maxRedeals: Type.Number(),
   currentTrick: Type.Optional(TrickSchema),
-  klopf: Type.Optional(KlopfStateSchema),
+  klopf: KlopfStateSchema,
   completedTricks: Type.Optional(Type.Array(CompletedTrickSchema)),
 });
 export type GameStateInfo = Static<typeof GameStateInfoSchema>;
@@ -79,6 +80,7 @@ export const RoundResultSchema = Type.Object({
   livesLost: Type.Number(),
   livesLeft: Type.Number(),
   isLoser: Type.Boolean(),
+  folded: Type.Boolean(),
 });
 export type RoundResult = Static<typeof RoundResultSchema>;
 

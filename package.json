@@ -7,7 +7,7 @@
     "dev:backend": "pnpm --filter backend run dev",
     "dev:frontend": "pnpm --filter frontend run start",
     "build": "pnpm -r run build",
-    "typecheck": "pnpm -r exec tsc --noEmit",
+    "typecheck": "pnpm -r run typecheck",
     "test": "pnpm --filter backend run test"
   },
   "devDependencies": {

@@ -1,8 +1,9 @@
 import type { ServerWebSocket } from 'bun';
+import { MAX_REDEALS } from '@klopf/shared';
 import type { WsData } from '../handler.js';
 import { createRoom, getRoom, removeRoom, isOwner } from '../../game/room.js';
-import { createPlayer, isAlive } from '../../game/player.js';
-import { addPlayer, getPlayer, getCurrentPlayerId, toGameStateInfo } from '../../game/game.js';
+import { createPlayer, isActive } from '../../game/player.js';
+import { addPlayer, getPlayer, toGameStateInfo, cancelAllTimers } from '../../game/game.js';
 import { registerConnection, getPlayerId, getPlayerRoom, removePlayerRoom } from '../connections.js';
 import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
 import { toPlayerInfo } from '../../game/player.js';
@@ -78,14 +79,14 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
 
   if (room.game.state === 'klopf_pending') {
     const klopf = room.game.klopf;
-    if (player.id !== klopf.initiator && isAlive(player) && !klopf.responses.has(player.id)) {
+    if (player.id !== klopf.initiator && isActive(player) && !klopf.responses.has(player.id)) {
       send(ws, { type: 'klopf_response_needed', level: klopf.level });
     }
   }
 
   if (room.game.state === 'redeal_pending') {
     if (player.id !== room.game.redealRequester && !room.game.redealResponses.has(player.id)) {
-      send(ws, { type: 'redeal_response_needed', redealCount: room.game.redealCount, maxRedeals: 3 });
+      send(ws, { type: 'redeal_response_needed', redealCount: room.game.redealCount, maxRedeals: MAX_REDEALS });
     }
   }
 
@@ -107,6 +108,7 @@ export function handleCloseRoom(ws: ServerWebSocket<WsData>): void {
     return;
   }
 
+  cancelAllTimers(room.game);
   broadcastToRoom(room, { type: 'room_closed' });
 
   for (const player of room.game.players) {

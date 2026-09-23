@@ -13,26 +13,18 @@ export function addCardToTrick(trick: TrickState, playerId: string, card: Card):
   trick.cards.push({ playerId, card });
 }
 
-export function isTrickComplete(trick: TrickState, numPlayers: number): boolean {
-  return trick.cards.length >= numPlayers;
+export function isTrickComplete(trick: TrickState, activeIds: string[]): boolean {
+  return activeIds.every((id) => trick.cards.some((tc) => tc.playerId === id));
 }
 
-export function determineTrickWinner(trick: TrickState): string {
-  if (trick.cards.length === 0) return '';
-
-  let winningIdx = 0;
-  let winningCard = trick.cards[0].card;
-
-  for (let i = 1; i < trick.cards.length; i++) {
-    const currentCard = trick.cards[i].card;
-    if (cardBeats(currentCard, winningCard, trick.leadSuit as Suit)) {
-      winningIdx = i;
-      winningCard = currentCard;
-    }
+export function determineTrickWinner(trick: TrickState, eligibleIds: string[]): string {
+  let winner: TrickState['cards'][number] | undefined;
+  for (const tc of trick.cards) {
+    if (!eligibleIds.includes(tc.playerId)) continue;
+    if (!winner || cardBeats(tc.card, winner.card, trick.leadSuit as Suit)) winner = tc;
   }
-
-  trick.winnerId = trick.cards[winningIdx].playerId;
-  return trick.winnerId;
+  trick.winnerId = winner?.playerId;
+  return trick.winnerId ?? '';
 }
 
 export function toTrickInfo(trick: TrickState): TrickInfo {

@@ -140,11 +140,6 @@ export const KlopfResolvedMessage = Type.Object({
   level: Type.Number(),
 });
 
-export const TrickWonMessage = Type.Object({
-  type: Type.Literal('trick_won'),
-  winnerId: Type.String(),
-});
-
 export const RoundEndedMessage = Type.Object({
   type: Type.Literal('round_ended'),
   results: Type.Array(RoundResultSchema),
@@ -166,11 +161,6 @@ export const GameStateMessage = Type.Object({
 export const ErrorMessage = Type.Object({
   type: Type.Literal('error'),
   error: Type.String(),
-});
-
-export const TimerUpdateMessage = Type.Object({
-  type: Type.Literal('timer_update'),
-  timeLeft: Type.Number(),
 });
 
 export const RedealRequestedMessage = Type.Object({
@@ -207,12 +197,10 @@ export const ServerMessageSchema = Type.Union([
   KlopfInitiatedMessage,
   KlopfResponseNeededMessage,
   KlopfResolvedMessage,
-  TrickWonMessage,
   RoundEndedMessage,
   GameOverMessage,
   GameStateMessage,
   ErrorMessage,
-  TimerUpdateMessage,
   RedealRequestedMessage,
   RedealResponseNeededMessage,
   RedealPerformedMessage,

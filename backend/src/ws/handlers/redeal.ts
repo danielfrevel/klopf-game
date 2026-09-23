@@ -1,10 +1,10 @@
 import type { ServerWebSocket } from 'bun';
 import type { WsData } from '../handler.js';
 import { getRoom } from '../../game/room.js';
-import { requestRedeal, respondToRedeal, getRedealInfo, getPlayer } from '../../game/game.js';
-import { isAlive } from '../../game/player.js';
-import { getPlayerId, getPlayerRoom, getPlayerWs } from '../connections.js';
-import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { requestRedeal, respondToRedeal, getRedealInfo, activePlayers } from '../../game/game.js';
+import { getPlayerId, getPlayerRoom } from '../connections.js';
+import { sendError, sendToPlayer, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { sendCards } from './game.js';
 
 export function handleRequestRedeal(ws: ServerWebSocket<WsData>): void {
   const playerId = getPlayerId(ws);
@@ -20,11 +20,8 @@ export function handleRequestRedeal(ws: ServerWebSocket<WsData>): void {
 
   broadcastToRoom(room, { type: 'redeal_requested', playerId: requester });
 
-  for (const p of room.game.players) {
-    if (p.id !== playerId && isAlive(p)) {
-      const pws = getPlayerWs(p.id);
-      if (pws) send(pws, { type: 'redeal_response_needed', redealCount: count, maxRedeals });
-    }
+  for (const p of activePlayers(room.game)) {
+    if (p.id !== playerId) sendToPlayer(p.id, { type: 'redeal_response_needed', redealCount: count, maxRedeals });
   }
 }
 
@@ -41,21 +38,7 @@ export function handleRedealResponse(ws: ServerWebSocket<WsData>, agree: boolean
   if (agree) {
     const { count, maxRedeals } = getRedealInfo(room.game);
     broadcastToRoom(room, { type: 'redeal_performed', redealCount: count, maxRedeals });
-
-    for (const player of room.game.players) {
-      if (isAlive(player)) {
-        const pws = getPlayerWs(player.id);
-        if (pws) send(pws, { type: 'cards_dealt', cards: player.hand });
-      }
-    }
-
-    if (room.game.klopf.active) {
-      broadcastToRoom(room, {
-        type: 'klopf_initiated',
-        playerId: room.game.klopf.initiator,
-        level: room.game.klopf.level,
-      });
-    }
+    sendCards(room);
   } else {
     broadcastToRoom(room, { type: 'redeal_declined' });
   }
