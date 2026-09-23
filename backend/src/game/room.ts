@@ -22,6 +22,10 @@ export function createRoom(): RoomData {
   return room;
 }
 
+export function restoreRoom(room: RoomData): void {
+  rooms.set(room.code, room);
+}
+
 export function getRoom(code: string): RoomData | undefined {
   return rooms.get(code.toLowerCase());
 }

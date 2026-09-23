@@ -218,8 +218,8 @@ export function initiateGameKlopf(game: GameData, playerId: string): string | nu
   return null;
 }
 
-function startResponseTimer(game: GameData): void {
-  startPhaseTimer(game, game.timeouts.responseMs, 'klopf', () => {
+function startResponseTimer(game: GameData, ms = game.timeouts.responseMs): void {
+  startPhaseTimer(game, ms, 'klopf', () => {
     if (game.state !== 'klopf_pending') return;
     const round = game.roundNumber;
     for (const player of activePlayers(game)) {
@@ -435,12 +435,16 @@ export function requestRedeal(game: GameData, playerId: string): string | null {
   game.redealRequester = playerId;
   game.redealResponses = new Map();
   game.state = 'redeal_pending';
-  startPhaseTimer(game, game.timeouts.responseMs, 'redeal', () => {
+  startRedealTimer(game);
+  return null;
+}
+
+function startRedealTimer(game: GameData, ms = game.timeouts.responseMs): void {
+  startPhaseTimer(game, ms, 'redeal', () => {
     if (game.state !== 'redeal_pending') return;
     const other = activePlayers(game).find((p) => p.id !== game.redealRequester);
     if (other) respondToRedeal(game, other.id, false);
   });
-  return null;
 }
 
 export function respondToRedeal(game: GameData, playerId: string, agree: boolean): string | null {
@@ -469,13 +473,23 @@ export function getRedealInfo(game: GameData): { requester: string; count: numbe
   return { requester: game.redealRequester, count: game.redealCount, maxRedeals: MAX_REDEALS };
 }
 
-function startPlayerTimer(game: GameData): void {
+export function resumeTimers(game: GameData): void {
+  const remainingMs = game.phaseEndsAt === null ? undefined : Math.max(0, game.phaseEndsAt - Date.now());
+  switch (game.state) {
+    case 'playing': startPlayerTimer(game, remainingMs); break;
+    case 'dealing': beginDealing(game, remainingMs); break;
+    case 'klopf_pending': startResponseTimer(game, remainingMs); break;
+    case 'redeal_pending': startRedealTimer(game, remainingMs); break;
+  }
+}
+
+function startPlayerTimer(game: GameData, ms = game.timeouts.turnMs): void {
   const currentPlayer = getCurrentPlayer(game);
   if (!currentPlayer) return;
 
   cancelPlayerTimer(game);
   const playerId = currentPlayer.id;
-  game.phaseEndsAt = Date.now() + game.timeouts.turnMs;
+  game.phaseEndsAt = Date.now() + ms;
 
   game.turnTimer = setTimeout(() => {
     game.turnTimer = null;
@@ -489,7 +503,7 @@ function startPlayerTimer(game: GameData): void {
     } else {
       playRandomCard(game, playerId);
     }
-  }, game.timeouts.turnMs);
+  }, ms);
 }
 
 function cancelPlayerTimer(game: GameData): void {

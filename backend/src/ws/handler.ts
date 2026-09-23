@@ -8,6 +8,8 @@ import { handleCreateRoom, handleJoinRoom, handleReconnect, handleCloseRoom, han
 import { handleStartGame, handlePlayCard, handleSetStakes, handleRevealCards, handleRestartGame } from './handlers/game.js';
 import { handleKlopf, handleKlopfResponse, handleBlindDrei } from './handlers/klopf.js';
 import { handleRequestRedeal, handleRedealResponse } from './handlers/redeal.js';
+import { getRoom } from '../game/room.js';
+import { saveRoom } from '../persistence/db.js';
 import { log } from '../utils/logger.js';
 
 export interface WsData {
@@ -49,7 +51,10 @@ export const wsHandler = new Elysia().ws('/ws', {
   },
 
   message(ws, message) {
-    handleMessage(ws as unknown as ServerWebSocket<WsData>, message);
+    const socket = ws as unknown as ServerWebSocket<WsData>;
+    handleMessage(socket, message);
+    const room = getRoom(socket.data.roomCode);
+    if (room) saveRoom(room);
   },
 
   close(ws) {

@@ -7,6 +7,7 @@ import { createPlayer, isActive, toPlayerInfo } from '../../game/player.js';
 import { addPlayer, getPlayer, removePlayer, toGameStateInfo, cancelAllTimers, GameErrors } from '../../game/game.js';
 import { registerConnection, getPlayerId, getPlayerRoom, removeConnection, removePlayerRoom } from '../connections.js';
 import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { deleteRoom, saveRoom } from '../../persistence/db.js';
 import { log } from '../../utils/logger.js';
 
 const MAX_NAME_LENGTH = 20;
@@ -124,10 +125,12 @@ function leaveLobby(room: RoomData, playerId: string): void {
 
   if (room.game.players.length === 0) {
     removeRoom(room.code);
+    deleteRoom(room.code);
     return;
   }
   broadcastToRoom(room, { type: 'player_left', playerId });
   broadcastGameState(room);
+  saveRoom(room);
 }
 
 export function handleCloseRoom(ws: ServerWebSocket<WsData>): void {
@@ -154,4 +157,5 @@ export function handleCloseRoom(ws: ServerWebSocket<WsData>): void {
   }
 
   removeRoom(roomCode);
+  deleteRoom(room.code);
 }

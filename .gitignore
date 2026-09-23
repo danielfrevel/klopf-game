@@ -18,6 +18,7 @@ frontend/.sass-cache/
 frontend/*.tsbuildinfo
 
 # Backend
+backend/data/
 backend/klopf-server
 backend/*.exe
 

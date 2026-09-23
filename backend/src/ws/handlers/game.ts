@@ -9,6 +9,7 @@ import {
 } from '../../game/game.js';
 import { getPlayerId, getPlayerRoom } from '../connections.js';
 import { sendError, sendToPlayer, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { saveRoom } from '../../persistence/db.js';
 import { log } from '../../utils/logger.js';
 
 export function attachRoomCallbacks(room: RoomData): void {
@@ -19,11 +20,13 @@ export function attachRoomCallbacks(room: RoomData): void {
     const cardId = playRandomCard(room.game, playerId);
     if (!cardId) return;
     processCardPlayed(room, playerId, handBefore.find((c) => c.id === cardId));
+    saveRoom(room);
   };
   room.game.onPhaseExpired = (kind) => {
     if (kind === 'klopf') broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
     if (kind === 'redeal') broadcastToRoom(room, { type: 'redeal_declined' });
     finishAction(room);
+    saveRoom(room);
   };
 }
 

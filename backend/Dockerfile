@@ -25,6 +25,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/backend ./backend
 RUN ln -s /app/node_modules /app/backend/node_modules
+RUN mkdir -p /app/data
 ENV PORT=8080
+ENV DB_PATH=/app/data/klopf.sqlite
+VOLUME /app/data
 EXPOSE 8080
 CMD ["bun", "backend/src/index.ts"]

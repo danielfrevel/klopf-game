@@ -5,6 +5,8 @@ services:
       dockerfile: backend/Dockerfile
     ports:
       - "8080:8080"
+    volumes:
+      - klopf-data:/app/data
     restart: unless-stopped
 
   klopf-frontend:
@@ -16,3 +18,6 @@ services:
     depends_on:
       - klopf-backend
     restart: unless-stopped
+
+volumes:
+  klopf-data:
