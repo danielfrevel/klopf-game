@@ -5,7 +5,7 @@ Ein Multiplayer-Kartenspiel mit WebSocket-Unterstützung.
 ## Spielregeln
 
 - 2-4 Spieler, 32 Karten (7-8-9-10-B-D-K-A in allen vier Farben)
-- Rang (hoch zu niedrig): 10 > 9 > 8 > 7 > Bube > Dame > König > Ass
+- Rang (hoch zu niedrig): 10 > 9 > 8 > 7 > Ass > König > Dame > Bube
 - Jeder Spieler startet mit 7 Leben und erhält 4 Karten pro Runde
 - Erste Karte bestimmt die Stich-Farbe, höchste Karte gewinnt
 - **Gewinner des letzten Stichs gewinnt die Runde**
@@ -36,37 +36,19 @@ Ein Multiplayer-Kartenspiel mit WebSocket-Unterstützung.
 
 ## Entwicklung
 
-### Schnellstart (tmux)
+### Mit Nix
 
 ```bash
-./dev.sh
-```
-
-Startet tmux mit 3 Fenstern:
-
-- `shell` - Nix-Shell für Befehle
-- `backend` - Bun-Server auf Port 8080
-- `frontend` - Angular auf Port 4200
-
-### Mit Nix (manuell)
-
-```bash
-cd klopf-game
-
-# Nix-Shell aktivieren (mit direnv automatisch)
-direnv allow
-# oder manuell:
-nix develop
-
-# Shared Types bauen (einmalig)
+direnv allow        # oder: nix develop
+pnpm install
 pnpm --filter @klopf/shared run build
-
-# Backend starten
-cd backend && bun --watch src/index.ts
-
-# Frontend starten (neues Terminal)
-cd frontend && npm start
+pnpm dev
 ```
+
+`pnpm dev` startet Backend und Frontend parallel:
+
+- Backend: Bun-Server auf Port 5551 (`ws://localhost:5551/ws`)
+- Frontend: Angular auf http://localhost:4200, der Dev-Server leitet `/ws` an Port 5551 weiter
 
 ### Ohne Nix
 
@@ -80,11 +62,7 @@ Benötigt:
 pnpm install
 pnpm --filter @klopf/shared run build
 
-# Backend
-cd backend && bun --watch src/index.ts
-
-# Frontend
-cd frontend && pnpm start
+pnpm dev
 ```
 
 ### Mit Docker
@@ -95,8 +73,10 @@ docker compose up --build
 
 Zugriff:
 
-- Frontend: http://localhost:4200
-- Backend WebSocket: ws://localhost:5551/ws
+- Frontend: http://localhost:4200 (nginx leitet `/ws` an das Backend weiter)
+- Backend: Port 8080 (`ws://localhost:8080/ws`, Health unter `/health`)
+
+Im Container läuft das Backend auf 8080, lokal im Dev-Modus auf 5551.
 
 ## Projektstruktur
 
