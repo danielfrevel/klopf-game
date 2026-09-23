@@ -25,6 +25,11 @@ export interface KlopfData {
   lastKlopper: string;
 }
 
+export interface GameTimeouts {
+  turnMs: number;
+  dealingMs: number;
+}
+
 export interface GameData {
   state: GameState;
   players: PlayerState[];
@@ -39,6 +44,7 @@ export interface GameData {
   redealRequester: string;
   redealResponses: Map<string, boolean>;
   turnTimer: ReturnType<typeof setTimeout> | null;
+  timeouts: GameTimeouts;
   onTimeout?: (playerId: string) => void;
   lastRoundResults?: { winnerId: string; results: import('@klopf/shared').RoundResult[] };
 }

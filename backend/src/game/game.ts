@@ -7,7 +7,7 @@ import {
   TRICKS_PER_ROUND,
   DEFAULT_STAKES,
 } from '@klopf/shared';
-import type { GameData, PlayerState } from './types.js';
+import type { GameData, GameTimeouts, PlayerState } from './types.js';
 import { createPlayer, hasCard, removeCard, getCardsOfSuit, isAlive, loseLives, toPlayerInfo } from './player.js';
 import { createDeck, shuffleDeck, dealCards } from './deck.js';
 import { createTrick, addCardToTrick, isTrickComplete, determineTrickWinner, toTrickInfo } from './trick.js';
@@ -37,9 +37,12 @@ export const GameErrors = {
   ALREADY_REQUESTED_REDEAL: 'Already requested redeal',
 } as const;
 
-const TURN_TIMEOUT_MS = 60_000;
+export const DEFAULT_TIMEOUTS: GameTimeouts = {
+  turnMs: 60_000,
+  dealingMs: 30_000,
+};
 
-export function createGame(): GameData {
+export function createGame(timeouts: GameTimeouts = DEFAULT_TIMEOUTS): GameData {
   return {
     state: 'lobby',
     players: [],
@@ -54,6 +57,7 @@ export function createGame(): GameData {
     redealRequester: '',
     redealResponses: new Map(),
     turnTimer: null,
+    timeouts: { ...timeouts },
     onTimeout: undefined,
     lastRoundResults: undefined,
   };
@@ -426,7 +430,7 @@ function startPlayerTimer(game: GameData): void {
     } else {
       playRandomCard(game, currentPlayer.id);
     }
-  }, TURN_TIMEOUT_MS);
+  }, game.timeouts.turnMs);
 }
 
 function cancelPlayerTimer(game: GameData): void {
