@@ -1,60 +1,62 @@
 import type { ServerWebSocket } from 'bun';
 import type { WsData } from './handler.js';
 
+export interface ConnectionInfo {
+  playerId: string;
+  roomCode: string;
+}
+
 let connectionCounter = 0;
-const connectionData = new Map<number, { playerId: string; roomCode: string }>();
-const playerConns = new Map<string, { ws: ServerWebSocket<WsData>; connId: number }>();
+const connectionData = new Map<number, ConnectionInfo>();
+const playerSockets = new Map<string, Map<number, ServerWebSocket<WsData>>>();
 const playerRooms = new Map<string, string>();
 
 export function nextConnId(): number {
   return ++connectionCounter;
 }
 
-export function registerConnection(
-  ws: ServerWebSocket<WsData>,
-  playerId: string,
-  roomCode: string,
-): void {
-  const connId = ws.data?.connId ?? connectionCounter;
+function detach(connId: number): ConnectionInfo | null {
+  const data = connectionData.get(connId);
+  if (!data) return null;
+  connectionData.delete(connId);
+
+  const sockets = playerSockets.get(data.playerId);
+  sockets?.delete(connId);
+  if (sockets && sockets.size > 0) return null;
+
+  playerSockets.delete(data.playerId);
+  playerRooms.delete(data.playerId);
+  return data;
+}
+
+export function registerConnection(ws: ServerWebSocket<WsData>, playerId: string, roomCode: string): ConnectionInfo | null {
+  const connId = ws.data.connId;
+  const previous = connectionData.get(connId);
+  const displaced = previous && previous.playerId !== playerId ? detach(connId) : null;
+
   connectionData.set(connId, { playerId, roomCode });
-  playerConns.set(playerId, { ws, connId });
+  if (!playerSockets.has(playerId)) playerSockets.set(playerId, new Map());
+  playerSockets.get(playerId)!.set(connId, ws);
   playerRooms.set(playerId, roomCode);
-  if (ws.data) {
-    ws.data.playerId = playerId;
-    ws.data.roomCode = roomCode;
-  }
+  ws.data.playerId = playerId;
+  ws.data.roomCode = roomCode;
+  return displaced;
 }
 
 export function getPlayerId(ws: ServerWebSocket<WsData>): string {
-  const connId = ws.data?.connId;
-  if (connId !== undefined) {
-    const data = connectionData.get(connId);
-    if (data) return data.playerId;
-  }
-  return ws.data?.playerId ?? '';
+  return connectionData.get(ws.data.connId)?.playerId ?? '';
 }
 
 export function getPlayerRoom(playerId: string): string {
   return playerRooms.get(playerId) ?? '';
 }
 
-export function getPlayerWs(playerId: string): ServerWebSocket<WsData> | undefined {
-  return playerConns.get(playerId)?.ws;
+export function getPlayerSockets(playerId: string): ServerWebSocket<WsData>[] {
+  return [...(playerSockets.get(playerId)?.values() ?? [])];
 }
 
-export function removeConnection(ws: ServerWebSocket<WsData>): { playerId: string; roomCode: string } | null {
-  const connId = ws.data?.connId;
-  if (connId === undefined) return null;
-
-  const data = connectionData.get(connId);
-  if (!data?.playerId) return null;
-
-  connectionData.delete(connId);
-  if (playerConns.get(data.playerId)?.connId !== connId) return null;
-
-  playerConns.delete(data.playerId);
-  playerRooms.delete(data.playerId);
-  return data;
+export function removeConnection(ws: ServerWebSocket<WsData>): ConnectionInfo | null {
+  return detach(ws.data.connId);
 }
 
 export function removePlayerRoom(playerId: string): void {

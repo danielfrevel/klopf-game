@@ -2,7 +2,7 @@ import type { ServerWebSocket } from 'bun';
 import type { ErrorCode, ServerMessage } from '@klopf/shared';
 import type { RoomData } from '../game/types.js';
 import type { WsData } from './handler.js';
-import { getPlayerWs } from './connections.js';
+import { getPlayerSockets } from './connections.js';
 import { toGameStateInfo } from '../game/game.js';
 import { saveRoom } from '../persistence/db.js';
 
@@ -15,14 +15,15 @@ export function sendError(ws: ServerWebSocket<WsData>, error: string, code?: Err
 }
 
 export function sendToPlayer(playerId: string, msg: ServerMessage): void {
-  const ws = getPlayerWs(playerId);
-  if (ws) send(ws, msg);
+  const payload = JSON.stringify(msg);
+  for (const ws of getPlayerSockets(playerId)) ws.send(payload);
 }
 
 export function broadcastToRoom(room: RoomData, msg: ServerMessage): void {
   const payload = JSON.stringify(msg);
   for (const player of room.game.players) {
-    if (player.connected) getPlayerWs(player.id)?.send(payload);
+    if (!player.connected) continue;
+    for (const ws of getPlayerSockets(player.id)) ws.send(payload);
   }
 }
 

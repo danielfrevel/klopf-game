@@ -19,8 +19,6 @@ export class GameStateService {
   private _gameState = signal<GameStateInfo | null>(null);
   private _myCards = signal<Card[]>([]);
   private _lastPlayedCard = signal<{ playerId: string; card: Card } | null>(null);
-  private _redealResponseNeeded = signal<boolean>(false);
-  private _redealRequesterName = signal<string | null>(null);
   private _roundResults = signal<RoundResult[] | null>(null);
   private _winnerId = signal<string | null>(null);
   private _perfectWin = signal<boolean>(false);
@@ -33,8 +31,6 @@ export class GameStateService {
   readonly gameState = this._gameState.asReadonly();
   readonly myCards = this._myCards.asReadonly();
   readonly lastPlayedCard = this._lastPlayedCard.asReadonly();
-  readonly redealResponseNeeded = this._redealResponseNeeded.asReadonly();
-  readonly redealRequesterName = this._redealRequesterName.asReadonly();
   readonly roundResults = this._roundResults.asReadonly();
   readonly winnerId = this._winnerId.asReadonly();
   readonly perfectWin = this._perfectWin.asReadonly();
@@ -54,6 +50,14 @@ export class GameStateService {
     const state = this._gameState();
     const myResponse = state?.klopf.responses?.find(r => r.playerId === this._playerId());
     return state?.state === 'klopf_pending' && myResponse?.mitgehen === null;
+  });
+  readonly redealResponseNeeded = computed(() => {
+    const state = this._gameState();
+    return state?.state === 'redeal_pending' && this.isActive() && state.redealRequester !== this._playerId();
+  });
+  readonly redealRequesterName = computed(() => {
+    const state = this._gameState();
+    return state?.players.find(p => p.id === state.redealRequester)?.name ?? null;
   });
   readonly activePlayers = computed(() => (this._gameState()?.players ?? []).filter(p => p.lives > 0 && !p.folded));
   readonly isActive = computed(() => {
@@ -156,24 +160,18 @@ export class GameStateService {
         break;
 
       case 'redeal_requested':
-        this._redealRequesterName.set(this._gameState()?.players.find(p => p.id === msg.playerId)?.name ?? null);
         this.logger.info('GameState', 'Redeal requested', { playerId: msg.playerId });
         break;
 
       case 'redeal_response_needed':
-        this._redealResponseNeeded.set(true);
         this.logger.info('GameState', 'Redeal response needed', { redealCount: msg.redealCount, maxRedeals: msg.maxRedeals });
         break;
 
       case 'redeal_performed':
-        this._redealResponseNeeded.set(false);
-        this._redealRequesterName.set(null);
         this.logger.info('GameState', 'Redeal performed', { count: msg.redealCount });
         break;
 
       case 'redeal_declined':
-        this._redealResponseNeeded.set(false);
-        this._redealRequesterName.set(null);
         this.logger.info('GameState', 'Redeal declined');
         break;
 
@@ -235,7 +233,5 @@ export class GameStateService {
     this._perfectWin.set(false);
     this._winnings.set(0);
     this._roundResults.set(null);
-    this._redealResponseNeeded.set(false);
-    this._redealRequesterName.set(null);
   }
 }

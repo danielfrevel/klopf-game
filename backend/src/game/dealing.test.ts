@@ -115,3 +115,33 @@ describe('response timers', () => {
     expect(expired).toEqual(['redeal']);
   });
 });
+
+describe('einigung responses', () => {
+  test('requester cannot answer their own einigung', () => {
+    const game = dealingGame(2);
+    ok(requestRedeal(game, 'A'));
+    expect(respondToRedeal(game, 'A', false)).toBe(GameErrors.OWN_REDEAL);
+    expect(game.state).toBe('redeal_pending');
+  });
+
+  test('eliminated player cannot answer an einigung', () => {
+    const game = gameWithPlayers(3);
+    player(game, 'C').lives = 0;
+    ok(startGame(game));
+    ok(requestRedeal(game, 'A'));
+    expect(respondToRedeal(game, 'C', true)).toBe(GameErrors.PLAYER_NOT_ACTIVE);
+    expect(game.state).toBe('redeal_pending');
+  });
+
+  test('klopf timeout reports the level of the resolved klopf', async () => {
+    const game = startedGame(2, { responseMs: 10 });
+    const levels: number[] = [];
+    game.onPhaseExpired = (_kind, klopfLevel) => levels.push(klopfLevel);
+    ok(initiateGameKlopf(game, 'A'));
+    ok(respondToGameKlopf(game, 'B', true));
+    ok(initiateGameKlopf(game, 'B'));
+    await Bun.sleep(25);
+    expect(game.roundNumber).toBe(2);
+    expect(levels).toEqual([2]);
+  });
+});

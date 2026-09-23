@@ -5,7 +5,7 @@ import type { PlayerState, RoomData } from '../../game/types.js';
 import { createRoom, getRoom, removeRoom, disposeRoom } from '../../game/room.js';
 import { createPlayer, isActive, toPlayerInfo } from '../../game/player.js';
 import { addPlayer, getPlayer, removePlayer, GameErrors } from '../../game/game.js';
-import { registerConnection, removeConnection, removePlayerRoom } from '../connections.js';
+import { registerConnection, removeConnection, removePlayerRoom, type ConnectionInfo } from '../connections.js';
 import { send, sendError, broadcastToRoom, commitRoom } from '../broadcast.js';
 import { deleteRoom } from '../../persistence/db.js';
 import { hostRoom } from '../context.js';
@@ -27,7 +27,7 @@ function joinAs(ws: ServerWebSocket<WsData>, room: RoomData, rawName: string): P
     return null;
   }
 
-  registerConnection(ws, player.id, room.code);
+  goOffline(registerConnection(ws, player.id, room.code));
   send(ws, { type: 'room_created', roomCode: room.code, playerId: player.id, token: player.token });
   return player;
 }
@@ -71,7 +71,7 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
   clearTimeout(room.lobbyLeaveTimers.get(playerId));
   room.lobbyLeaveTimers.delete(playerId);
   player.connected = true;
-  registerConnection(ws, playerId, room.code);
+  goOffline(registerConnection(ws, playerId, room.code));
   log.room.info(`Player ${player.name} reconnected to room ${room.code} (state: ${room.game.state})`);
 
   send(ws, { type: 'room_created', roomCode: room.code, playerId, token });
@@ -88,7 +88,7 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
   }
 
   if (room.game.state === 'redeal_pending') {
-    if (player.id !== room.game.redealRequester) {
+    if (player.id !== room.game.redealRequester && isActive(player)) {
       send(ws, { type: 'redeal_response_needed', redealCount: room.game.redealCount, maxRedeals: MAX_REDEALS });
     }
   }
@@ -98,9 +98,11 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
 }
 
 export function handleDisconnect(ws: ServerWebSocket<WsData>): void {
-  const data = removeConnection(ws);
-  if (!data) return;
+  goOffline(removeConnection(ws));
+}
 
+function goOffline(data: ConnectionInfo | null): void {
+  if (!data) return;
   const room = getRoom(data.roomCode);
   const player = room && getPlayer(room.game, data.playerId);
   if (!room || !player) return;
@@ -108,10 +110,19 @@ export function handleDisconnect(ws: ServerWebSocket<WsData>): void {
   player.connected = false;
   broadcastToRoom(room, { type: 'player_left', playerId: player.id });
   commitRoom(room);
+  if (room.game.state === 'lobby') scheduleLobbyLeave(room, player.id);
+}
 
-  if (room.game.state === 'lobby') {
-    room.lobbyLeaveTimers.set(player.id, setTimeout(() => leaveLobby(room, player.id), room.game.timeouts.lobbyLeaveMs));
+export function resumeLobbyLeave(room: RoomData): void {
+  if (room.game.state !== 'lobby') return;
+  for (const player of room.game.players) {
+    if (!player.connected) scheduleLobbyLeave(room, player.id);
   }
+}
+
+function scheduleLobbyLeave(room: RoomData, playerId: string): void {
+  clearTimeout(room.lobbyLeaveTimers.get(playerId));
+  room.lobbyLeaveTimers.set(playerId, setTimeout(() => leaveLobby(room, playerId), room.game.timeouts.lobbyLeaveMs));
 }
 
 function leaveLobby(room: RoomData, playerId: string): void {

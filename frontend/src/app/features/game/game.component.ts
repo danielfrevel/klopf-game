@@ -323,22 +323,9 @@ export class GameComponent implements OnInit, OnDestroy {
 
   canRequestRedeal(): boolean {
     const state = this.gameState.gameState();
-    if (!state || state.state !== 'dealing') {
-      return false;
-    }
-
-    // Only allowed with exactly 2 alive players
-    const alivePlayers = state.players.filter(p => p.lives > 0);
-    if (alivePlayers.length !== 2) {
-      return false;
-    }
-
-    // Check redeal limit
-    if (state.redealCount >= state.maxRedeals) {
-      return false;
-    }
-
-    return true;
+    return state?.state === 'dealing'
+      && this.gameState.activePlayers().length === 2
+      && state.redealCount < state.maxRedeals;
   }
 
   requestRedeal(): void {

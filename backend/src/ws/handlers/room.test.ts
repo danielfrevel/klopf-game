@@ -2,7 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import { getRoom } from '../../game/room.js';
 import { getHostId, getPlayer } from '../../game/game.js';
 import { fakeWs, lastOfType, type FakeWs } from '../test-helpers.js';
-import { handleCreateRoom, handleDisconnect, handleJoinRoom, handleReconnect } from './room.js';
+import { handleCreateRoom, handleDisconnect, handleJoinRoom, handleReconnect, resumeLobbyLeave } from './room.js';
+import { handleStartGame } from './game.js';
+import { handleRequestRedeal } from './redeal.js';
 
 function session(ws: FakeWs) {
   const created = lastOfType(ws, 'room_created');
@@ -91,5 +93,51 @@ describe('sessions', () => {
     handleReconnect(fakeWs(), room.code, sessions[1].playerId, sessions[1].token);
     await Bun.sleep(25);
     expect(getPlayer(room.game, sessions[1].playerId)?.connected).toBe(true);
+  });
+});
+
+describe('several tabs and restored lobbies', () => {
+  test('closing the newer of two tabs keeps the older tab live', () => {
+    const { room, sockets, sessions } = roomWith('Anna', 'Ben');
+    const secondTab = fakeWs();
+    handleReconnect(secondTab, room.code, sessions[1].playerId, sessions[1].token);
+
+    handleDisconnect(secondTab);
+    expect(getPlayer(room.game, sessions[1].playerId)?.connected).toBe(true);
+
+    const before = sockets[1].sent.length;
+    handleJoinRoom(fakeWs(), room.code, 'Cleo');
+    expect(sockets[1].sent.length).toBeGreaterThan(before);
+  });
+
+  test('tab joining another room marks its old player offline', () => {
+    const first = roomWith('Anna', 'Ben');
+    const second = roomWith('Dora');
+    handleJoinRoom(first.sockets[1], second.room.code, 'Ben');
+    expect(getPlayer(first.room.game, first.sessions[1].playerId)?.connected).toBe(false);
+  });
+
+  test('restored lobby drops players who never come back', async () => {
+    const { room, sessions } = roomWith('Anna', 'Ben');
+    room.game.timeouts.lobbyLeaveMs = 10;
+    for (const p of room.game.players) p.connected = false;
+    handleReconnect(fakeWs(), room.code, sessions[0].playerId, sessions[0].token);
+
+    resumeLobbyLeave(room);
+    await Bun.sleep(25);
+    expect(room.game.players.map((p) => p.id)).toEqual([sessions[0].playerId]);
+  });
+
+  test('reconnect asks only active players to answer an einigung', () => {
+    const { room, sockets, sessions } = roomWith('Anna', 'Ben', 'Cleo');
+    handleStartGame(sockets[0]);
+    getPlayer(room.game, sessions[2].playerId)!.lives = 0;
+    handleRequestRedeal(sockets[0]);
+    expect(room.game.state).toBe('redeal_pending');
+
+    const cleo = fakeWs();
+    handleReconnect(cleo, room.code, sessions[2].playerId, sessions[2].token);
+    expect(lastOfType(cleo, 'redeal_response_needed')).toBeUndefined();
+    expect(lastOfType(cleo, 'game_state')?.state.redealRequester).toBe(sessions[0].playerId);
   });
 });

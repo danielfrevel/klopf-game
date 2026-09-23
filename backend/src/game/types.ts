@@ -55,7 +55,7 @@ export interface GameData {
   dealingRemainingMs: number | null;
   timeouts: GameTimeouts;
   onTimeout?: (playerId: string) => void;
-  onPhaseExpired?: (kind: PhaseKind) => void;
+  onPhaseExpired?: (kind: PhaseKind, klopfLevel: number) => void;
   lastRoundResults?: { winnerId: string; results: RoundResult[] };
 }
 

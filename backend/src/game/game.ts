@@ -30,6 +30,7 @@ export const GameErrors = {
   PLAYER_NOT_FOUND: 'Player not found',
   PLAYER_NOT_ACTIVE: 'Player is not active in this round',
   OWN_KLOPF: 'Cannot respond to own klopf',
+  OWN_REDEAL: 'Cannot respond to own redeal request',
   ALREADY_REVEALED: 'Cards already revealed',
   REDEAL_LIMIT_REACHED: 'Redeal limit reached',
   REDEAL_NOT_ALLOWED: 'Redeal only allowed with 2 players',
@@ -436,7 +437,10 @@ function startRedealTimer(game: GameData, ms = game.timeouts.responseMs): void {
 
 export function respondToRedeal(game: GameData, playerId: string, agree: boolean): string | null {
   if (game.state !== 'redeal_pending') return GameErrors.WRONG_STATE;
-  if (playerId === game.redealRequester) return null;
+  if (playerId === game.redealRequester) return GameErrors.OWN_REDEAL;
+  const player = getPlayer(game, playerId);
+  if (!player) return GameErrors.PLAYER_NOT_FOUND;
+  if (!isActive(player)) return GameErrors.PLAYER_NOT_ACTIVE;
 
   const remainingMs = game.dealingRemainingMs ?? game.timeouts.dealingMs;
   game.dealingRemainingMs = null;
@@ -505,8 +509,9 @@ function startPhaseTimer(game: GameData, ms: number, kind: PhaseKind, expire: ()
   game.phaseTimer = setTimeout(() => {
     game.phaseTimer = null;
     game.phaseEndsAt = null;
+    const klopfLevel = game.klopf.level;
     expire();
-    game.onPhaseExpired?.(kind);
+    game.onPhaseExpired?.(kind, klopfLevel);
   }, ms);
 }
 
@@ -542,5 +547,6 @@ export function toGameStateInfo(game: GameData): GameStateInfo {
     })),
     phaseEndsAt: game.phaseEndsAt,
     hostId: getHostId(game),
+    redealRequester: game.redealRequester,
   };
 }

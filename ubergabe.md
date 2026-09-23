@@ -94,7 +94,7 @@ Module-level `Map<string, RoomData>` als Cache. `createRoom()`, `getRoom()`, `re
 
 - `handler.ts`: Elysia-WS-Setup und Message-Router
 - `context.ts`: `senderRoom(ws)` und `hostRoom(ws, action)` lösen Spieler und Raum einer Nachricht auf und senden sonst den Fehler
-- `connections.ts`: Verbindungs-Tracking (connId, playerId, roomCode). Ein alter Socket räumt beim Schließen nur seine eigenen Einträge ab
+- `connections.ts`: Verbindungs-Tracking. Ein Spieler kann mehrere Sockets haben (mehrere Tabs). Offline ist er erst, wenn der letzte schließt. Tritt ein Socket als anderer Spieler bei, geht der alte Spieler offline
 - `broadcast.ts`: `send()`, `sendError(ws, error, code?)`, `broadcastToRoom()`, `commitRoom()`. `commitRoom` sendet den GameState an alle und speichert den Raum. Jede erfolgreiche Änderung endet dort
 - `handlers/room.ts`: create, join, reconnect, close, disconnect, Lobby-Frist
 - `handlers/game.ts`: start, reveal, play_card, stakes, restart. `finishAction(room)` sendet nach jeder Aktion Rundenergebnis, neue Karten, Auto-Klopf, Game Over und GameState. `attachRoomCallbacks(room)` verdrahtet die Timer mit dem Handler-Layer
@@ -107,7 +107,7 @@ Module-level `Map<string, RoomData>` als Cache. `createRoom()`, `getRoom()`, `re
 - `app.ts`: öffnet die WebSocket-Verbindung einmal beim App-Start
 - `core/services/websocket.service.ts`: WebSocket, Nachrichten als Observable, Reconnect mit exponentiellem Backoff (30 Versuche, maximal 30 s)
 - `core/services/session.service.ts`: Session je Raum in localStorage
-- `core/services/game-state.service.ts`: Signals-basierter State. `klopfResponseNeeded` und `activePlayers` sind aus `game_state` abgeleitet. `phaseSecondsLeft` tickt nur, solange `phaseEndsAt` gesetzt ist
+- `core/services/game-state.service.ts`: Signals-basierter State. `klopfResponseNeeded`, `redealResponseNeeded`, `redealRequesterName` und `activePlayers` sind aus `game_state` abgeleitet. `phaseSecondsLeft` tickt nur, solange `phaseEndsAt` gesetzt ist
 - `features/start/`: Name, Raum erstellen, Code eingeben
 - `features/room/`: Shell für `/room/:code`, zeigt je nach State Lobby, Spiel oder Ergebnis. Kümmert sich um Reconnect und Beitritt
 - `features/lobby/`, `features/game/`, `features/results/`: die drei Ansichten im Raum
@@ -194,7 +194,7 @@ game_over      ──restart_game────────────► lobby
 
 `ErrorCode` ist `room_not_found`, `invalid_session` oder `name_taken`. Das Frontend reagiert auf `code`, nicht auf den Text.
 
-`GameStateInfo` enthält neben Spielern, Stich und Zähler immer `klopf` (mit `lastKlopper` und `responses` nur für aktive Nicht-Klopfer), `phaseEndsAt` (Epoch-ms oder `null`) und `hostId`. `Player` enthält `folded` und `revealed`. `RoundResult` enthält `folded`.
+`GameStateInfo` enthält neben Spielern, Stich und Zähler immer `klopf` (mit `lastKlopper` und `responses` nur für aktive Nicht-Klopfer), `phaseEndsAt` (Epoch-ms oder `null`), `hostId` und `redealRequester`. `Player` enthält `folded` und `revealed`. `RoundResult` enthält `folded`.
 
 `trick_won` und `timer_update` gibt es nicht mehr. `your_turn` steht im Schema, der Server sendet es nicht.
 
@@ -212,7 +212,7 @@ game_over      ──restart_game────────────► lobby
 - SQLite über `bun:sqlite`, Tabelle `rooms(code, data, updated_at)`, ein JSON-Snapshot je Raum, WAL-Modus
 - Pfad: `DB_PATH`, Standard `data/klopf.sqlite` relativ zum Arbeitsverzeichnis (lokal `backend/data/`, in Git ignoriert). Docker nutzt `/app/data/klopf.sqlite` im Volume `klopf-data`
 - Der Server speichert in `commitRoom`, also nach jeder erfolgreichen Änderung, egal ob sie von einer Nachricht oder einem Timer kommt. Abgelehnte Nachrichten schreiben nichts. `close_room` löscht den Raum
-- Beim Start löscht der Server Räume, die länger als 24 h unverändert sind, lädt den Rest und setzt die Timer mit der Restzeit wieder auf. Danach läuft der Purge stündlich
+- Beim Start löscht der Server Räume, die länger als 24 h unverändert sind, lädt den Rest und setzt die Timer mit der Restzeit wieder auf. Für Lobby-Spieler startet die 60-s-Frist neu. Danach läuft der Purge stündlich
 - Details: ADR 0003
 
 ## Tests
@@ -260,7 +260,6 @@ pnpm dev            # Backend :5551, Frontend :4200
 - Kein Auth: Wer Raumcode, Spieler-ID und Token kennt, spielt als dieser Spieler
 - Countdown im Browser rechnet mit der Server-Uhr (`phaseEndsAt`). Weicht die Browser-Uhr ab, stimmt die Anzeige nicht, die Spiellogik schon
 - Nach einem Reload im Zustand `game_over` fehlen Gewinnsumme und Perfektes Spiel, weil der Server `game_over` beim Reconnect nicht erneut sendet
-- Tritt ein Tab ohne Reload einem anderen Raum bei, übernimmt der neue Spieler den Socket. Der alte Spieler bleibt als verbunden markiert, bis der Tab neu lädt
 
 ## Dependencies
 

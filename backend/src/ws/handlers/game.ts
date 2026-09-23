@@ -19,8 +19,8 @@ export function attachRoomCallbacks(room: RoomData): void {
     if (!cardId) return;
     processCardPlayed(room, playerId, handBefore.find((c) => c.id === cardId));
   };
-  room.game.onPhaseExpired = (kind) => {
-    if (kind === 'klopf') broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
+  room.game.onPhaseExpired = (kind, klopfLevel) => {
+    if (kind === 'klopf') broadcastToRoom(room, { type: 'klopf_resolved', level: klopfLevel });
     if (kind === 'redeal') broadcastToRoom(room, { type: 'redeal_declined' });
     finishAction(room);
   };

@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { wsHandler } from './ws/handler.js';
 import { attachRoomCallbacks } from './ws/handlers/game.js';
+import { resumeLobbyLeave } from './ws/handlers/room.js';
 import { disposeRoom, getRoom, restoreRoom } from './game/room.js';
 import { resumeTimers } from './game/game.js';
 import { loadRooms, purgeOlderThan } from './persistence/db.js';
@@ -25,6 +26,7 @@ for (const room of restored) {
   restoreRoom(room);
   attachRoomCallbacks(room);
   resumeTimers(room.game);
+  resumeLobbyLeave(room);
 }
 log.room.info(`Restored ${restored.length} rooms`);
 setInterval(purgeExpiredRooms, PURGE_INTERVAL_MS);
