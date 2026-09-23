@@ -203,7 +203,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           [level]="gameState.gameState()?.klopf?.level || 1"
           [mustMitgehen]="gameState.me()?.lives === 1"
           [declineCost]="declineCost()"
-          [loseCost]="(gameState.gameState()?.klopf?.level || 1) + 1"
+          [loseCost]="loseCost()"
           (response)="respondToKlopf($event)"
         />
       }
@@ -349,8 +349,15 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   declineCost(): number {
-    const level = this.gameState.gameState()?.klopf.level || 1;
-    return Math.min(level, this.gameState.me()?.lives ?? level);
+    return this.cappedAtLives(this.gameState.gameState()?.klopf.level || 1);
+  }
+
+  loseCost(): number {
+    return this.cappedAtLives((this.gameState.gameState()?.klopf.level || 1) + 1);
+  }
+
+  private cappedAtLives(cost: number): number {
+    return Math.min(cost, this.gameState.me()?.lives ?? cost);
   }
 
   isKlopfInitiator(): boolean {

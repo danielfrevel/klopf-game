@@ -21,7 +21,7 @@ import { CardComponent } from '../card/card.component';
           }
         </div>
       } @else {
-        <p class="text-base-content/50">Warte auf ersten Stich...</p>
+        <p class="text-base-content/50">Noch keine Karte im Stich</p>
       }
     </div>
   `
