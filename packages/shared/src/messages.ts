@@ -33,6 +33,10 @@ export const CloseRoomMessage = Type.Object({
   type: Type.Literal('close_room'),
 });
 
+export const LeaveRoomMessage = Type.Object({
+  type: Type.Literal('leave_room'),
+});
+
 export const RestartGameMessage = Type.Object({
   type: Type.Literal('restart_game'),
 });
@@ -80,6 +84,7 @@ export const ClientMessageSchema = Type.Union([
   ReconnectMessage,
   StartGameMessage,
   CloseRoomMessage,
+  LeaveRoomMessage,
   RestartGameMessage,
   PlayCardMessage,
   KlopfMessage,

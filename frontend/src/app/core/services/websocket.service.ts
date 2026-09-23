@@ -93,6 +93,10 @@ export class WebsocketService implements OnDestroy {
     this.send({ type: 'reconnect', roomCode, playerId, token });
   }
 
+  leaveRoom(): void {
+    this.send({ type: 'leave_room' });
+  }
+
   restartGame(): void {
     this.send({ type: 'restart_game' });
   }

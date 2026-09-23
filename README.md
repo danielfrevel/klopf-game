@@ -145,6 +145,7 @@ klopf-game/
 - `reconnect` - Wiedereinstieg mit Token nach Reload oder Disconnect
 - `start_game` - Spiel starten (nur Host)
 - `restart_game` - Revanche nach Spielende (nur Host)
+- `leave_room` - Raum verlassen ("Zurück" auf der Ergebnisseite)
 - `reveal_cards` - Karten aufdecken in der Austeilphase
 - `play_card` - Karte ausspielen
 - `klopf` - Klopfen

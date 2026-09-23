@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
-import { WebsocketService, GameStateService, SessionService, ServerMessage } from '../../core/services';
+import { WebsocketService, GameStateService, SessionService, ServerMessage, errorText } from '../../core/services';
 import { LobbyComponent } from '../lobby/lobby.component';
 import { GameComponent } from '../game/game.component';
 import { ResultsComponent } from '../results/results.component';
@@ -121,7 +121,7 @@ export class RoomComponent {
         } else if (msg.code === 'name_taken') {
           this.joinError.set('Diesen Namen gibt es in diesem Raum schon.');
         } else if (!this.joined()) {
-          this.joinError.set(msg.error);
+          this.joinError.set(errorText(msg.error));
         }
         break;
     }

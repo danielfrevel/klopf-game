@@ -101,6 +101,12 @@ export function handleDisconnect(ws: ServerWebSocket<WsData>): void {
   goOffline(removeConnection(ws));
 }
 
+export function handleLeaveRoom(ws: ServerWebSocket<WsData>): void {
+  goOffline(removeConnection(ws));
+  ws.data.playerId = '';
+  ws.data.roomCode = '';
+}
+
 function goOffline(data: ConnectionInfo | null): void {
   if (!data) return;
   const room = getRoom(data.roomCode);

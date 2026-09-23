@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { getRoom } from '../../game/room.js';
 import { getHostId, getPlayer } from '../../game/game.js';
 import { fakeWs, lastOfType, type FakeWs } from '../test-helpers.js';
-import { handleCreateRoom, handleDisconnect, handleJoinRoom, handleReconnect, resumeLobbyLeave } from './room.js';
-import { handleStartGame } from './game.js';
+import { handleCreateRoom, handleDisconnect, handleJoinRoom, handleLeaveRoom, handleReconnect, resumeLobbyLeave } from './room.js';
+import { handleRestartGame, handleStartGame } from './game.js';
 import { handleRequestRedeal } from './redeal.js';
 
 function session(ws: FakeWs) {
@@ -139,5 +139,18 @@ describe('several tabs and restored lobbies', () => {
     handleReconnect(cleo, room.code, sessions[2].playerId, sessions[2].token);
     expect(lastOfType(cleo, 'redeal_response_needed')).toBeUndefined();
     expect(lastOfType(cleo, 'game_state')?.state.redealRequester).toBe(sessions[0].playerId);
+  });
+});
+
+describe('leaving', () => {
+  test('player who leaves the results page does not survive the revanche', () => {
+    const { room, sockets, sessions } = roomWith('Anna', 'Ben', 'Cleo');
+    room.game.state = 'game_over';
+    handleLeaveRoom(sockets[1]);
+    expect(getPlayer(room.game, sessions[1].playerId)?.connected).toBe(false);
+    expect(lastOfType(sockets[0], 'player_left')?.playerId).toBe(sessions[1].playerId);
+
+    handleRestartGame(sockets[0]);
+    expect(room.game.players.map((p) => p.name)).toEqual(['Anna', 'Cleo']);
   });
 });

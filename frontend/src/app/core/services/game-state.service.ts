@@ -5,6 +5,7 @@ import { WebsocketService, ServerMessage } from './websocket.service';
 import { Card, GameStateInfo, Player, RoundResult, GameState } from '@klopf/shared';
 import { LoggerService } from './logger.service';
 import { SessionService } from './session.service';
+import { errorText } from './error-text';
 
 @Injectable({
   providedIn: 'root'
@@ -192,7 +193,7 @@ export class GameStateService {
         break;
 
       case 'error':
-        this._error.set(msg.error || 'Unknown error');
+        this._error.set(errorText(msg.error));
         this.logger.error('GameState', 'Server error', { error: msg.error });
         setTimeout(() => this._error.set(null), 5000);
         break;

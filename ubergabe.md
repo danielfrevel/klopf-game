@@ -161,6 +161,7 @@ game_over      ──restart_game────────────► lobby
 | `start_game`      | -                               |
 | `close_room`      | -                               |
 | `restart_game`    | -                               |
+| `leave_room`      | -                               |
 | `reveal_cards`    | -                               |
 | `play_card`       | `{ cardId }`                    |
 | `klopf`           | -                               |
@@ -204,6 +205,7 @@ game_over      ──restart_game────────────► lobby
 - Beim Beitritt gibt der Server jedem Spieler ein geheimes Token (`crypto.randomUUID()`). Der Browser speichert `{ playerId, token }` in localStorage unter `klopf_session_<code>`
 - Reload und neuer Tab im selben Browser senden `reconnect` mit Token und landen wieder im Spiel
 - Falsches Token oder unbekannter Spieler liefert `invalid_session`, ein unbekannter Raum `room_not_found`. Das Frontend löscht dann die Session und zeigt das Namensformular
+- "Zurück" auf der Ergebnisseite sendet `leave_room`. Der Server meldet den Spieler ab, und die nächste Revanche entfernt ihn
 - Namen sind pro Raum eindeutig (getrimmt, case-insensitive, 1 bis 20 Zeichen)
 - Details: ADR 0002
 

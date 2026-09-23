@@ -55,6 +55,7 @@ export {
   ReconnectMessage,
   StartGameMessage,
   CloseRoomMessage,
+  LeaveRoomMessage,
   RestartGameMessage,
   PlayCardMessage,
   KlopfMessage,

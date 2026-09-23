@@ -64,7 +64,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
                 } @else if (player.folded) {
                   <span class="badge badge-error badge-sm">ausgestiegen</span>
                 } @else {
-                  {{ player.cardCount }} Karten
+                  {{ player.cardCount }} {{ player.cardCount === 1 ? 'Karte' : 'Karten' }}
                 }
               </div>
             </div>
@@ -159,9 +159,15 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
               </button>
             }
           </div>
+          @if (gameState.me()?.folded) {
+            <p class="text-sm text-error mb-2">Du bist ausgestiegen und spielst diese Runde nicht mehr mit.</p>
+          }
+          @if (gameState.error()) {
+            <div class="alert alert-error mb-2 py-2"><span>{{ gameState.error() }}</span></div>
+          }
           <app-player-hand
             [cards]="gameState.myCards()"
-            [faceDown]="gameState.gameState()?.state === 'dealing' && !gameState.me()?.revealed"
+            [faceDown]="!gameState.me()?.revealed"
             [canPlay]="gameState.isMyTurn()"
             [selectedCardId]="selectedCard()?.id || null"
             (cardSelected)="selectCard($event)"
@@ -196,7 +202,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           [initiatorName]="getKlopfInitiatorName()"
           [level]="gameState.gameState()?.klopf?.level || 1"
           [mustMitgehen]="gameState.me()?.lives === 1"
-          [declineCost]="gameState.gameState()?.klopf?.level || 1"
+          [declineCost]="declineCost()"
           [loseCost]="(gameState.gameState()?.klopf?.level || 1) + 1"
           (response)="respondToKlopf($event)"
         />
@@ -342,9 +348,14 @@ export class GameComponent implements OnInit, OnDestroy {
     return `${remaining} übrig`;
   }
 
+  declineCost(): number {
+    const level = this.gameState.gameState()?.klopf.level || 1;
+    return Math.min(level, this.gameState.me()?.lives ?? level);
+  }
+
   isKlopfInitiator(): boolean {
     const state = this.gameState.gameState();
-    return !!(state?.klopf?.active && state.klopf.initiator === this.gameState.playerId());
+    return state?.state === 'klopf_pending' && state.klopf.initiator === this.gameState.playerId();
   }
 
   getKlopfInitiatorName(): string {

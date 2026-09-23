@@ -122,6 +122,7 @@ export class ResultsComponent {
 
   leave(): void {
     const code = this.gameState.roomCode();
+    this.ws.leaveRoom();
     if (code) this.session.clear(code);
     this.gameState.reset();
     this.router.navigate(['/']);
