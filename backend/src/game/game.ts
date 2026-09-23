@@ -7,7 +7,7 @@ import {
   TRICKS_PER_ROUND,
   DEFAULT_STAKES,
 } from '@klopf/shared';
-import type { GameData, GameTimeouts, PlayerState } from './types.js';
+import type { GameData, GameTimeouts, PhaseKind, PlayerState } from './types.js';
 import { hasCard, removeCard, getCardsOfSuit, isAlive, isActive, loseLives, toPlayerInfo } from './player.js';
 import { createDeck, shuffleDeck, dealCards } from './deck.js';
 import { createTrick, addCardToTrick, isTrickComplete, determineTrickWinner, toTrickInfo } from './trick.js';
@@ -37,6 +37,7 @@ export const GameErrors = {
 export const DEFAULT_TIMEOUTS: GameTimeouts = {
   turnMs: 60_000,
   dealingMs: 30_000,
+  responseMs: 30_000,
 };
 
 export function createGame(timeouts: GameTimeouts = DEFAULT_TIMEOUTS): GameData {
@@ -54,10 +55,12 @@ export function createGame(timeouts: GameTimeouts = DEFAULT_TIMEOUTS): GameData 
     redealRequester: '',
     redealResponses: new Map(),
     turnTimer: null,
-    dealingTimer: null,
+    phaseTimer: null,
     phaseEndsAt: null,
+    dealingRemainingMs: null,
     timeouts: { ...timeouts },
     onTimeout: undefined,
+    onPhaseExpired: undefined,
     lastRoundResults: undefined,
   };
 }
@@ -122,6 +125,7 @@ function tryAutoKlopf(game: GameData): boolean {
     return false;
   }
   game.state = 'klopf_pending';
+  startResponseTimer(game);
   return true;
 }
 
@@ -137,11 +141,31 @@ function startRound(game: GameData, leaderId: string): void {
   const leaderIndex = game.players.findIndex((p) => p.id === leaderId && isAlive(p));
   game.currentPlayerIndex = leaderIndex !== -1 ? leaderIndex : game.players.findIndex(isAlive);
 
-  if (!tryAutoKlopf(game)) startPlaying(game);
+  if (!tryAutoKlopf(game)) beginDealing(game);
+}
+
+function beginDealing(game: GameData, remainingMs = game.timeouts.dealingMs): void {
+  game.state = 'dealing';
+  startPhaseTimer(game, remainingMs, 'dealing', () => {
+    if (game.state === 'dealing') startPlaying(game);
+  });
+}
+
+export function revealCards(game: GameData, playerId: string): string | null {
+  if (game.state !== 'dealing') return GameErrors.WRONG_STATE;
+
+  const player = getPlayer(game, playerId);
+  if (!player) return GameErrors.PLAYER_NOT_FOUND;
+  if (!isActive(player)) return GameErrors.PLAYER_NOT_ACTIVE;
+  if (player.revealed) return GameErrors.ALREADY_REVEALED;
+
+  player.revealed = true;
+  if (activePlayers(game).every((p) => p.revealed)) startPlaying(game);
+  return null;
 }
 
 export function startPlaying(game: GameData): void {
-  cancelDealingTimer(game);
+  cancelPhaseTimer(game);
   for (const player of activePlayers(game)) player.revealed = true;
   game.state = 'playing';
   game.trickNumber = 1;
@@ -164,8 +188,8 @@ export function blindDrei(game: GameData, playerId: string): string | null {
     return err;
   }
 
-  cancelDealingTimer(game);
   game.state = 'klopf_pending';
+  startResponseTimer(game);
   return null;
 }
 
@@ -180,9 +204,21 @@ export function initiateGameKlopf(game: GameData, playerId: string): string | nu
   if (err) return err;
 
   cancelPlayerTimer(game);
-  cancelDealingTimer(game);
   game.state = 'klopf_pending';
+  startResponseTimer(game);
   return null;
+}
+
+function startResponseTimer(game: GameData): void {
+  startPhaseTimer(game, game.timeouts.responseMs, 'klopf', () => {
+    if (game.state !== 'klopf_pending') return;
+    const round = game.roundNumber;
+    for (const player of activePlayers(game)) {
+      if (game.state !== 'klopf_pending' || game.roundNumber !== round) return;
+      if (player.id === game.klopf.initiator || game.klopf.responses.has(player.id)) continue;
+      respondToGameKlopf(game, player.id, player.mustMitgehen);
+    }
+  });
 }
 
 export function respondToGameKlopf(game: GameData, playerId: string, mitgehen: boolean): string | null {
@@ -213,6 +249,7 @@ export function respondToGameKlopf(game: GameData, playerId: string, mitgehen: b
 }
 
 function resumeAfterKlopf(game: GameData): void {
+  cancelPhaseTimer(game);
   if (game.trickNumber === 0) {
     startPlaying(game);
     return;
@@ -357,9 +394,15 @@ export function requestRedeal(game: GameData, playerId: string): string | null {
   if (game.redealCount >= MAX_REDEALS) return GameErrors.REDEAL_LIMIT_REACHED;
   if (game.redealRequester === playerId) return GameErrors.ALREADY_REQUESTED_REDEAL;
 
+  game.dealingRemainingMs = Math.max(0, (game.phaseEndsAt ?? Date.now()) - Date.now());
   game.redealRequester = playerId;
   game.redealResponses = new Map();
   game.state = 'redeal_pending';
+  startPhaseTimer(game, game.timeouts.responseMs, 'redeal', () => {
+    if (game.state !== 'redeal_pending') return;
+    const other = activePlayers(game).find((p) => p.id !== game.redealRequester);
+    if (other) respondToRedeal(game, other.id, false);
+  });
   return null;
 }
 
@@ -368,25 +411,21 @@ export function respondToRedeal(game: GameData, playerId: string, agree: boolean
   if (playerId === game.redealRequester) return null;
 
   game.redealResponses.set(playerId, agree);
+  const remainingMs = game.dealingRemainingMs ?? game.timeouts.dealingMs;
+  game.dealingRemainingMs = null;
+  game.redealRequester = '';
+  game.redealResponses = new Map();
 
   if (agree) {
     game.redealCount++;
-    performRedeal(game);
+    resetKlopf(game.klopf);
+    dealHands(game);
+    beginDealing(game);
   } else {
-    game.redealRequester = '';
-    game.redealResponses = new Map();
-    game.state = 'dealing';
+    beginDealing(game, remainingMs);
   }
 
   return null;
-}
-
-function performRedeal(game: GameData): void {
-  resetKlopf(game.klopf);
-  dealHands(game);
-  game.redealRequester = '';
-  game.redealResponses = new Map();
-  game.state = 'dealing';
 }
 
 export function getRedealInfo(game: GameData): { requester: string; count: number; maxRedeals: number } {
@@ -424,17 +463,28 @@ function cancelPlayerTimer(game: GameData): void {
   }
 }
 
-function cancelDealingTimer(game: GameData): void {
-  if (game.dealingTimer) {
-    clearTimeout(game.dealingTimer);
-    game.dealingTimer = null;
+function startPhaseTimer(game: GameData, ms: number, kind: PhaseKind, expire: () => void): void {
+  cancelPhaseTimer(game);
+  game.phaseEndsAt = Date.now() + ms;
+  game.phaseTimer = setTimeout(() => {
+    game.phaseTimer = null;
+    game.phaseEndsAt = null;
+    expire();
+    game.onPhaseExpired?.(kind);
+  }, ms);
+}
+
+function cancelPhaseTimer(game: GameData): void {
+  if (game.phaseTimer) {
+    clearTimeout(game.phaseTimer);
+    game.phaseTimer = null;
     game.phaseEndsAt = null;
   }
 }
 
 export function cancelAllTimers(game: GameData): void {
   cancelPlayerTimer(game);
-  cancelDealingTimer(game);
+  cancelPhaseTimer(game);
 }
 
 export function toGameStateInfo(game: GameData): GameStateInfo {
@@ -454,5 +504,6 @@ export function toGameStateInfo(game: GameData): GameStateInfo {
       leadSuit: t.leadSuit,
       winnerId: t.winnerId ?? '',
     })),
+    phaseEndsAt: game.phaseEndsAt,
   };
 }

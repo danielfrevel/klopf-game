@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   GameErrors, getCurrentPlayerId, initiateGameKlopf, playCard, playRandomCard,
-  respondToGameKlopf, toGameStateInfo,
+  respondToGameKlopf, startPlaying, toGameStateInfo,
 } from './game.js';
 import { card, player, playTrick, setHands, startedGame } from './test-helpers.js';
 import type { Card } from '@klopf/shared';
@@ -33,7 +33,7 @@ describe('klopf and lives', () => {
     ok(respondToGameKlopf(game, 'B', true));
     playRoundAWinsAll(game);
     expect(game.roundNumber).toBe(2);
-    expect(game.state).toBe('playing');
+    expect(game.state).toBe('dealing');
     ok(initiateGameKlopf(game, 'A'));
   });
 
@@ -173,6 +173,7 @@ describe('klopf and lives', () => {
     expect(player(game, 'C').hand).toEqual([]);
     expect(getCurrentPlayerId(game)).toBe('B');
 
+    startPlaying(game);
     while (game.roundNumber === 2) {
       const current = getCurrentPlayerId(game);
       expect(current).not.toBe('C');

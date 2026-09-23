@@ -5,7 +5,7 @@ import type { WsData } from '../handler.js';
 import type { RoomData } from '../../game/types.js';
 import { getRoom, isOwner } from '../../game/room.js';
 import {
-  startGame, playCard, playRandomCard, setStakes, getPlayer, getWinner, activePlayers,
+  startGame, playCard, playRandomCard, setStakes, getPlayer, getWinner, activePlayers, revealCards,
 } from '../../game/game.js';
 import { getPlayerId, getPlayerRoom } from '../connections.js';
 import { sendError, sendToPlayer, broadcastToRoom, broadcastGameState } from '../broadcast.js';
@@ -19,6 +19,11 @@ export function attachRoomCallbacks(room: RoomData): void {
     const cardId = playRandomCard(room.game, playerId);
     if (!cardId) return;
     processCardPlayed(room, playerId, handBefore.find((c) => c.id === cardId));
+  };
+  room.game.onPhaseExpired = (kind) => {
+    if (kind === 'klopf') broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
+    if (kind === 'redeal') broadcastToRoom(room, { type: 'redeal_declined' });
+    finishAction(room);
   };
 }
 
@@ -72,6 +77,17 @@ export function handleStartGame(ws: ServerWebSocket<WsData>): void {
   broadcastToRoom(room, { type: 'game_started' });
   sendCards(room);
   if (room.game.state === 'klopf_pending') notifyKlopf(room);
+  broadcastGameState(room);
+}
+
+export function handleRevealCards(ws: ServerWebSocket<WsData>): void {
+  const playerId = getPlayerId(ws);
+  const room = getRoom(getPlayerRoom(playerId));
+  if (!room) { sendError(ws, 'Room not found'); return; }
+
+  const err = revealCards(room.game, playerId);
+  if (err) { sendError(ws, err); return; }
+
   broadcastGameState(room);
 }
 

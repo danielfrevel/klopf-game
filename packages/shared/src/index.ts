@@ -59,6 +59,7 @@ export {
   KlopfMessage,
   KlopfResponseMessage,
   BlindDreiMessage,
+  RevealCardsMessage,
   SetStakesMessage,
   RequestRedealMessage,
   RedealResponseMessage,

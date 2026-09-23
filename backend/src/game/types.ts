@@ -30,7 +30,10 @@ export interface KlopfData {
 export interface GameTimeouts {
   turnMs: number;
   dealingMs: number;
+  responseMs: number;
 }
+
+export type PhaseKind = 'dealing' | 'klopf' | 'redeal';
 
 export interface GameData {
   state: GameState;
@@ -46,10 +49,12 @@ export interface GameData {
   redealRequester: string;
   redealResponses: Map<string, boolean>;
   turnTimer: ReturnType<typeof setTimeout> | null;
-  dealingTimer: ReturnType<typeof setTimeout> | null;
+  phaseTimer: ReturnType<typeof setTimeout> | null;
   phaseEndsAt: number | null;
+  dealingRemainingMs: number | null;
   timeouts: GameTimeouts;
   onTimeout?: (playerId: string) => void;
+  onPhaseExpired?: (kind: PhaseKind) => void;
   lastRoundResults?: { winnerId: string; results: RoundResult[] };
 }
 

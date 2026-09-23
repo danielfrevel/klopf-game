@@ -6,7 +6,7 @@ import { nextConnId, removeConnection } from './connections.js';
 import { sendError, broadcastToRoom } from './broadcast.js';
 import { getRoom } from '../game/room.js';
 import { handleCreateRoom, handleJoinRoom, handleReconnect, handleCloseRoom } from './handlers/room.js';
-import { handleStartGame, handlePlayCard, handleSetStakes } from './handlers/game.js';
+import { handleStartGame, handlePlayCard, handleSetStakes, handleRevealCards } from './handlers/game.js';
 import { handleKlopf, handleKlopfResponse, handleBlindDrei } from './handlers/klopf.js';
 import { handleRequestRedeal, handleRedealResponse } from './handlers/redeal.js';
 import { log } from '../utils/logger.js';
@@ -29,6 +29,7 @@ function handleMessage(ws: ServerWebSocket<WsData>, message: ClientMessage): voi
     case 'klopf':          handleKlopf(ws); break;
     case 'klopf_response': handleKlopfResponse(ws, message.mitgehen); break;
     case 'blind_drei':     handleBlindDrei(ws); break;
+    case 'reveal_cards':   handleRevealCards(ws); break;
     case 'set_stakes':     handleSetStakes(ws, message.stakes); break;
     case 'request_redeal': handleRequestRedeal(ws); break;
     case 'redeal_response': handleRedealResponse(ws, message.agree); break;

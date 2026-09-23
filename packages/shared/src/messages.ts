@@ -55,6 +55,10 @@ export const SetStakesMessage = Type.Object({
   stakes: Type.Number(),
 });
 
+export const RevealCardsMessage = Type.Object({
+  type: Type.Literal('reveal_cards'),
+});
+
 export const RequestRedealMessage = Type.Object({
   type: Type.Literal('request_redeal'),
 });
@@ -75,6 +79,7 @@ export const ClientMessageSchema = Type.Union([
   KlopfMessage,
   KlopfResponseMessage,
   BlindDreiMessage,
+  RevealCardsMessage,
   SetStakesMessage,
   RequestRedealMessage,
   RedealResponseMessage,

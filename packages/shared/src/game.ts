@@ -70,6 +70,7 @@ export const GameStateInfoSchema = Type.Object({
   currentTrick: Type.Optional(TrickSchema),
   klopf: KlopfStateSchema,
   completedTricks: Type.Optional(Type.Array(CompletedTrickSchema)),
+  phaseEndsAt: Type.Union([Type.Number(), Type.Null()]),
 });
 export type GameStateInfo = Static<typeof GameStateInfoSchema>;
 
