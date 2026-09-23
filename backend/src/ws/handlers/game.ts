@@ -3,9 +3,9 @@ import type { Card } from '@klopf/shared';
 import { INITIAL_LIVES } from '@klopf/shared';
 import type { WsData } from '../handler.js';
 import type { RoomData } from '../../game/types.js';
-import { getRoom, isOwner } from '../../game/room.js';
+import { getRoom, isHost } from '../../game/room.js';
 import {
-  startGame, playCard, playRandomCard, setStakes, getPlayer, getWinner, activePlayers, revealCards,
+  startGame, playCard, playRandomCard, setStakes, getPlayer, getWinner, activePlayers, revealCards, restartGame,
 } from '../../game/game.js';
 import { getPlayerId, getPlayerRoom } from '../connections.js';
 import { sendError, sendToPlayer, broadcastToRoom, broadcastGameState } from '../broadcast.js';
@@ -65,8 +65,8 @@ export function handleStartGame(ws: ServerWebSocket<WsData>): void {
   const room = getRoom(getPlayerRoom(playerId));
   if (!room) { sendError(ws, 'Room not found'); return; }
 
-  if (!isOwner(room, playerId)) {
-    sendError(ws, 'Only room owner can start the game');
+  if (!isHost(room, playerId)) {
+    sendError(ws, 'Only the host can start the game');
     return;
   }
 
@@ -134,13 +134,29 @@ export function handlePlayCard(ws: ServerWebSocket<WsData>, cardId: string): voi
   processCardPlayed(room, playerId, playedCard);
 }
 
+export function handleRestartGame(ws: ServerWebSocket<WsData>): void {
+  const playerId = getPlayerId(ws);
+  const room = getRoom(getPlayerRoom(playerId));
+  if (!room) { sendError(ws, 'Room not found'); return; }
+
+  if (!isHost(room, playerId)) {
+    sendError(ws, 'Only the host can start a revanche');
+    return;
+  }
+
+  const err = restartGame(room.game);
+  if (err) { sendError(ws, err); return; }
+
+  broadcastGameState(room);
+}
+
 export function handleSetStakes(ws: ServerWebSocket<WsData>, stakes: number): void {
   const playerId = getPlayerId(ws);
   const room = getRoom(getPlayerRoom(playerId));
   if (!room) { sendError(ws, 'Room not found'); return; }
 
-  if (!isOwner(room, playerId)) {
-    sendError(ws, 'Only room owner can set stakes');
+  if (!isHost(room, playerId)) {
+    sendError(ws, 'Only the host can set stakes');
     return;
   }
 

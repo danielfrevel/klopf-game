@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { GameErrors, getCurrentPlayerId, playCard } from './game.js';
+import { GameErrors, getCurrentPlayerId, playCard, restartGame } from './game.js';
 import { card, playTrick, setHands, startedGame } from './test-helpers.js';
+import type { GameState } from '@klopf/shared';
 import type { GameData } from './types.js';
 
 const A_WINS_ALL = [
@@ -60,5 +61,30 @@ describe('characterization', () => {
     playRoundAWinsAll(game);
     expect(game.players[1].lives).toBe(0);
     expect(game.state).toBe('game_over');
+  });
+});
+
+describe('revanche', () => {
+  test('restart only from game over, resets lives and drops absent players', () => {
+    const game = startedGame(3);
+    expect(restartGame(game)).toBe(GameErrors.WRONG_STATE);
+
+    game.state = 'game_over' as GameState;
+    game.players[0].lives = 4;
+    game.players[1].lives = 0;
+    game.players[2].lives = 0;
+    game.players[2].connected = false;
+    game.stakes = 5;
+
+    expect(restartGame(game)).toBeNull();
+    expect(game.state).toBe('lobby');
+    expect(game.players.map((p) => p.id)).toEqual(['A', 'B']);
+    expect(game.players.every((p) => p.lives === 7 && p.hand.length === 0 && !p.folded)).toBe(true);
+    expect(game.roundNumber).toBe(0);
+    expect(game.trickNumber).toBe(0);
+    expect(game.completedTricks).toEqual([]);
+    expect(game.stakes).toBe(5);
+    expect(game.turnTimer).toBeNull();
+    expect(game.phaseEndsAt).toBeNull();
   });
 });

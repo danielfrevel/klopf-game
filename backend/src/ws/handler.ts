@@ -2,11 +2,10 @@ import { Elysia } from 'elysia';
 import type { ServerWebSocket } from 'bun';
 import type { ClientMessage } from '@klopf/shared';
 import { ClientMessageSchema } from '@klopf/shared';
-import { nextConnId, removeConnection } from './connections.js';
-import { sendError, broadcastToRoom } from './broadcast.js';
-import { getRoom } from '../game/room.js';
-import { handleCreateRoom, handleJoinRoom, handleReconnect, handleCloseRoom } from './handlers/room.js';
-import { handleStartGame, handlePlayCard, handleSetStakes, handleRevealCards } from './handlers/game.js';
+import { nextConnId } from './connections.js';
+import { sendError } from './broadcast.js';
+import { handleCreateRoom, handleJoinRoom, handleReconnect, handleCloseRoom, handleDisconnect } from './handlers/room.js';
+import { handleStartGame, handlePlayCard, handleSetStakes, handleRevealCards, handleRestartGame } from './handlers/game.js';
 import { handleKlopf, handleKlopfResponse, handleBlindDrei } from './handlers/klopf.js';
 import { handleRequestRedeal, handleRedealResponse } from './handlers/redeal.js';
 import { log } from '../utils/logger.js';
@@ -22,9 +21,10 @@ function handleMessage(ws: ServerWebSocket<WsData>, message: ClientMessage): voi
   switch (message.type) {
     case 'create_room':    handleCreateRoom(ws, message.playerName); break;
     case 'join_room':      handleJoinRoom(ws, message.roomCode, message.playerName); break;
-    case 'reconnect':      handleReconnect(ws, message.roomCode, message.playerId); break;
+    case 'reconnect':      handleReconnect(ws, message.roomCode, message.playerId, message.token); break;
     case 'start_game':     handleStartGame(ws); break;
     case 'close_room':     handleCloseRoom(ws); break;
+    case 'restart_game':   handleRestartGame(ws); break;
     case 'play_card':      handlePlayCard(ws, message.cardId); break;
     case 'klopf':          handleKlopf(ws); break;
     case 'klopf_response': handleKlopfResponse(ws, message.mitgehen); break;
@@ -34,20 +34,6 @@ function handleMessage(ws: ServerWebSocket<WsData>, message: ClientMessage): voi
     case 'request_redeal': handleRequestRedeal(ws); break;
     case 'redeal_response': handleRedealResponse(ws, message.agree); break;
     default: sendError(ws, 'Unknown message type');
-  }
-}
-
-function handleDisconnect(ws: ServerWebSocket<WsData>): void {
-  const data = removeConnection(ws);
-  if (!data) return;
-
-  const room = getRoom(data.roomCode);
-  if (!room) return;
-
-  const player = room.game.players.find((p) => p.id === data.playerId);
-  if (player) {
-    player.connected = false;
-    broadcastToRoom(room, { type: 'player_left', playerId: data.playerId });
   }
 }
 

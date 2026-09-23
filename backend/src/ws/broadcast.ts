@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from 'bun';
-import type { ServerMessage } from '@klopf/shared';
+import type { ErrorCode, ServerMessage } from '@klopf/shared';
 import type { RoomData } from '../game/types.js';
 import type { WsData } from './handler.js';
 import { getPlayerWs } from './connections.js';
@@ -9,8 +9,8 @@ export function send(ws: ServerWebSocket<WsData>, msg: ServerMessage): void {
   ws.send(JSON.stringify(msg));
 }
 
-export function sendError(ws: ServerWebSocket<WsData>, error: string): void {
-  send(ws, { type: 'error', error });
+export function sendError(ws: ServerWebSocket<WsData>, error: string, code?: ErrorCode): void {
+  send(ws, code ? { type: 'error', error, code } : { type: 'error', error });
 }
 
 export function sendToPlayer(playerId: string, msg: ServerMessage): void {

@@ -2,6 +2,7 @@ import type { Card, Suit, GameState, RoundResult } from '@klopf/shared';
 
 export interface PlayerState {
   readonly id: string;
+  readonly token: string;
   name: string;
   lives: number;
   hand: Card[];
@@ -31,6 +32,7 @@ export interface GameTimeouts {
   turnMs: number;
   dealingMs: number;
   responseMs: number;
+  lobbyLeaveMs: number;
 }
 
 export type PhaseKind = 'dealing' | 'klopf' | 'redeal';
@@ -60,6 +62,6 @@ export interface GameData {
 
 export interface RoomData {
   code: string;
-  ownerId: string;
   game: GameData;
+  lobbyLeaveTimers: Map<string, ReturnType<typeof setTimeout>>;
 }

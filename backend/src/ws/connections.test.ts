@@ -1,11 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { ServerWebSocket } from 'bun';
-import type { WsData } from './handler.js';
-import { getPlayerRoom, getPlayerWs, nextConnId, registerConnection, removeConnection } from './connections.js';
-
-function fakeWs(): ServerWebSocket<WsData> {
-  return { data: { connId: nextConnId(), playerId: '', roomCode: '' } } as unknown as ServerWebSocket<WsData>;
-}
+import { getPlayerRoom, getPlayerWs, registerConnection, removeConnection } from './connections.js';
+import { fakeWs } from './test-helpers.js';
 
 test('closing an old socket keeps the newer connection of the same player', () => {
   const ws1 = fakeWs();

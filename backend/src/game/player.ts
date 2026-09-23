@@ -5,6 +5,7 @@ import type { PlayerState } from './types.js';
 export function createPlayer(id: string, name: string): PlayerState {
   return {
     id,
+    token: crypto.randomUUID(),
     name,
     lives: INITIAL_LIVES,
     hand: [],

@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ThemeSwitcherComponent } from './shared/components/theme-switcher/theme-switcher.component';
+import { WebsocketService } from './core/services';
 
 @Component({
   selector: 'app-root',
@@ -13,4 +14,8 @@ import { ThemeSwitcherComponent } from './shared/components/theme-switcher/theme
     <router-outlet />
   `
 })
-export class App {}
+export class App {
+  constructor() {
+    inject(WebsocketService).connect();
+  }
+}

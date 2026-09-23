@@ -3,15 +3,11 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./features/lobby/lobby.component').then(m => m.LobbyComponent)
+    loadComponent: () => import('./features/start/start.component').then(m => m.StartComponent)
   },
   {
-    path: 'game',
-    loadComponent: () => import('./features/game/game.component').then(m => m.GameComponent)
-  },
-  {
-    path: 'results',
-    loadComponent: () => import('./features/results/results.component').then(m => m.ResultsComponent)
+    path: 'room/:code',
+    loadComponent: () => import('./features/room/room.component').then(m => m.RoomComponent)
   },
   {
     path: '**',

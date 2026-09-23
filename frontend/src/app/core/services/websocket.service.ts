@@ -30,7 +30,7 @@ export class WebsocketService implements OnDestroy {
   }
 
   connect(): void {
-    if (this.socket?.readyState === WebSocket.OPEN) {
+    if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
       this.logger.debug('WS', 'Already connected, skipping');
       return;
     }
@@ -42,7 +42,6 @@ export class WebsocketService implements OnDestroy {
       this.logger.info('WS', 'WebSocket connected');
       this.connectionStatus$.next(true);
       this.reconnectAttempts = 0;
-      this.tryReconnect();
     };
 
     this.socket.onclose = (event) => {
@@ -59,7 +58,6 @@ export class WebsocketService implements OnDestroy {
       try {
         const message: ServerMessage = JSON.parse(event.data);
         this.logger.debug('WS', `Received: ${message.type}`, message);
-        this.handleMessage(message);
         this.messages$.next(message);
       } catch (e) {
         this.logger.error('WS', 'Failed to parse message', { error: e, data: event.data });
@@ -75,7 +73,7 @@ export class WebsocketService implements OnDestroy {
   }
 
   send(message: ClientMessage): void {
-    if (this.socket?.readyState === WebSocket.OPEN) {
+    if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
       this.logger.debug('WS', `Sending: ${message.type}`, message);
       this.socket.send(JSON.stringify(message));
     } else {
@@ -89,6 +87,14 @@ export class WebsocketService implements OnDestroy {
 
   joinRoom(roomCode: string, playerName: string): void {
     this.send({ type: 'join_room', roomCode, playerName });
+  }
+
+  reconnect(roomCode: string, playerId: string, token: string): void {
+    this.send({ type: 'reconnect', roomCode, playerId, token });
+  }
+
+  restartGame(): void {
+    this.send({ type: 'restart_game' });
   }
 
   startGame(): void {
@@ -132,34 +138,7 @@ export class WebsocketService implements OnDestroy {
     this.send({ type: 'redeal_response', agree });
   }
 
-  private handleMessage(message: ServerMessage): void {
-    if (message.type === 'room_created') {
-      sessionStorage.setItem('klopf_room', message.roomCode);
-      sessionStorage.setItem('klopf_player', message.playerId);
-    }
-    if (message.type === 'error' && message.error === 'Room not found') {
-      sessionStorage.removeItem('klopf_room');
-      sessionStorage.removeItem('klopf_player');
-    }
-    if (message.type === 'room_closed') {
-      sessionStorage.removeItem('klopf_room');
-      sessionStorage.removeItem('klopf_player');
-    }
-  }
-
-  private tryReconnect(): void {
-    const roomCode = sessionStorage.getItem('klopf_room');
-    const playerId = sessionStorage.getItem('klopf_player');
-
-    if (roomCode && playerId) {
-      this.send({ type: 'reconnect', roomCode, playerId });
-    }
-  }
-
   private attemptReconnect(): void {
-    const hasSession = sessionStorage.getItem('klopf_room') && sessionStorage.getItem('klopf_player');
-    if (!hasSession) return;
-
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), 30000);

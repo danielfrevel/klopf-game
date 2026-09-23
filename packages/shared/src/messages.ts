@@ -22,6 +22,7 @@ export const ReconnectMessage = Type.Object({
   type: Type.Literal('reconnect'),
   roomCode: Type.String(),
   playerId: Type.String(),
+  token: Type.String(),
 });
 
 export const StartGameMessage = Type.Object({
@@ -30,6 +31,10 @@ export const StartGameMessage = Type.Object({
 
 export const CloseRoomMessage = Type.Object({
   type: Type.Literal('close_room'),
+});
+
+export const RestartGameMessage = Type.Object({
+  type: Type.Literal('restart_game'),
 });
 
 export const PlayCardMessage = Type.Object({
@@ -75,6 +80,7 @@ export const ClientMessageSchema = Type.Union([
   ReconnectMessage,
   StartGameMessage,
   CloseRoomMessage,
+  RestartGameMessage,
   PlayCardMessage,
   KlopfMessage,
   KlopfResponseMessage,
@@ -90,10 +96,18 @@ export type ClientMessage = Static<typeof ClientMessageSchema>;
 // Server -> Client Messages
 // ============================================
 
+export const ErrorCodeSchema = Type.Union([
+  Type.Literal('room_not_found'),
+  Type.Literal('invalid_session'),
+  Type.Literal('name_taken'),
+]);
+export type ErrorCode = Static<typeof ErrorCodeSchema>;
+
 export const RoomCreatedMessage = Type.Object({
   type: Type.Literal('room_created'),
   roomCode: Type.String(),
   playerId: Type.String(),
+  token: Type.String(),
 });
 
 export const RoomClosedMessage = Type.Object({
@@ -166,6 +180,7 @@ export const GameStateMessage = Type.Object({
 export const ErrorMessage = Type.Object({
   type: Type.Literal('error'),
   error: Type.String(),
+  code: Type.Optional(ErrorCodeSchema),
 });
 
 export const RedealRequestedMessage = Type.Object({

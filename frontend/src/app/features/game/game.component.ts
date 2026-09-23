@@ -1,6 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { WebsocketService, GameStateService } from '../../core/services';
 import { Card } from '@klopf/shared';
@@ -22,7 +21,10 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
         </div>
         <div class="flex-none gap-2">
           <span class="text-sm">Runde {{ gameState.gameState()?.roundNumber }}</span>
-          <span class="badge badge-outline">{{ gameState.roomCode() }}</span>
+          <span class="badge badge-outline uppercase">{{ gameState.roomCode() }}</span>
+          @if (gameState.isHost()) {
+            <button class="btn btn-ghost btn-sm text-error" (click)="closeRoom()">Raum schließen</button>
+          }
         </div>
       </header>
 
@@ -250,41 +252,6 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
         </div>
       }
 
-      <!-- Game Over -->
-      @if (gameState.winnerId()) {
-        <div class="modal modal-open">
-          <div class="modal-box text-center">
-            <h3 class="font-bold text-2xl mb-4">Spiel beendet!</h3>
-            @if (gameState.perfectWin()) {
-              <div class="mb-4">
-                <span class="text-4xl">🏆</span>
-                <p class="text-lg text-warning font-bold">Perfekter Sieg!</p>
-              </div>
-            }
-            <p class="text-lg mb-4">
-              <span class="font-bold text-primary">{{ getWinnerName() }}</span> gewinnt!
-            </p>
-            @if (gameState.perfectWin()) {
-              <p class="text-sm text-base-content/70 mb-4">
-                Ohne ein einziges Leben zu verlieren!
-              </p>
-            }
-            @if (gameState.winnings() > 0) {
-              <div class="bg-success/20 rounded-lg p-4 mb-4">
-                <p class="text-sm text-base-content/70">Gewinn</p>
-                <p class="text-2xl font-bold text-success">{{ gameState.winnings() }}€</p>
-                @if (gameState.perfectWin()) {
-                  <p class="text-xs text-base-content/50">(Verdoppelt durch perfekten Sieg!)</p>
-                }
-              </div>
-            }
-            <div class="modal-action justify-center">
-              <button class="btn btn-primary" (click)="backToLobby()">Zur Lobby</button>
-            </div>
-          </div>
-          <div class="modal-backdrop bg-black/50"></div>
-        </div>
-      }
     </div>
   `
 })
@@ -302,15 +269,10 @@ export class GameComponent implements OnInit, OnDestroy {
 
   constructor(
     private ws: WebsocketService,
-    public gameState: GameStateService,
-    private router: Router
+    public gameState: GameStateService
   ) {}
 
   ngOnInit(): void {
-    if (!this.gameState.roomCode()) {
-      this.router.navigate(['/']);
-    }
-
     this.msgSub = this.ws.messages.subscribe(msg => {
       if (msg.type === 'klopf_resolved' || msg.type === 'klopf_initiated') {
         this.klopfPending.set(false);
@@ -412,25 +374,15 @@ export class GameComponent implements OnInit, OnDestroy {
     return player?.name || '';
   }
 
-  getWinnerName(): string {
-    const state = this.gameState.gameState();
-    const winnerId = this.gameState.winnerId();
-    if (!state || !winnerId) return '';
-    const player = state.players.find(p => p.id === winnerId);
-    return player?.name || '';
-  }
-
   getLivesArray(lives: number): number[] {
     return Array(lives).fill(0);
   }
 
   continueGame(): void {
-    // Clear round results - game continues automatically
-    this.gameState['_roundResults'].set(null);
+    this.gameState.dismissRoundResults();
   }
 
-  backToLobby(): void {
-    this.gameState.clearSession();
-    this.router.navigate(['/']);
+  closeRoom(): void {
+    this.ws.closeRoom();
   }
 }

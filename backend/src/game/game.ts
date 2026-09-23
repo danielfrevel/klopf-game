@@ -1,5 +1,6 @@
 import type { GameStateInfo, RoundResult } from '@klopf/shared';
 import {
+  INITIAL_LIVES,
   MIN_PLAYERS,
   MAX_PLAYERS,
   CARDS_PER_PLAYER,
@@ -20,6 +21,7 @@ import { log } from '../utils/logger.js';
 export const GameErrors = {
   NOT_ENOUGH_PLAYERS: 'Not enough players',
   TOO_MANY_PLAYERS: 'Too many players',
+  NAME_TAKEN: 'Name already taken',
   GAME_ALREADY_STARTED: 'Game already started',
   WRONG_STATE: 'Wrong game state',
   NOT_YOUR_TURN: 'Not your turn',
@@ -38,6 +40,7 @@ export const DEFAULT_TIMEOUTS: GameTimeouts = {
   turnMs: 60_000,
   dealingMs: 30_000,
   responseMs: 30_000,
+  lobbyLeaveMs: 60_000,
 };
 
 export function createGame(timeouts: GameTimeouts = DEFAULT_TIMEOUTS): GameData {
@@ -68,6 +71,8 @@ export function createGame(timeouts: GameTimeouts = DEFAULT_TIMEOUTS): GameData 
 export function addPlayer(game: GameData, player: PlayerState): string | null {
   if (game.state !== 'lobby') return GameErrors.GAME_ALREADY_STARTED;
   if (game.players.length >= MAX_PLAYERS) return GameErrors.TOO_MANY_PLAYERS;
+  const name = player.name.toLowerCase();
+  if (game.players.some((p) => p.name.toLowerCase() === name)) return GameErrors.NAME_TAKEN;
   game.players.push(player);
   return null;
 }
@@ -79,6 +84,10 @@ export function removePlayer(game: GameData, playerId: string): void {
 
 export function getPlayer(game: GameData, playerId: string): PlayerState | undefined {
   return game.players.find((p) => p.id === playerId);
+}
+
+export function getHostId(game: GameData): string {
+  return (game.players.find((p) => p.connected) ?? game.players[0])?.id ?? '';
 }
 
 export function getAlivePlayers(game: GameData): PlayerState[] {
@@ -382,6 +391,34 @@ export function getWinner(game: GameData): PlayerState | undefined {
   return game.players.find(isAlive);
 }
 
+export function restartGame(game: GameData): string | null {
+  if (game.state !== 'game_over') return GameErrors.WRONG_STATE;
+
+  cancelAllTimers(game);
+  game.players = game.players.filter((p) => p.connected);
+  for (const player of game.players) {
+    player.lives = INITIAL_LIVES;
+    player.hand = [];
+    player.folded = false;
+    player.revealed = false;
+    player.roundLivesLost = 0;
+    player.mustMitgehen = false;
+  }
+  game.state = 'lobby';
+  game.currentPlayerIndex = 0;
+  game.currentTrick = null;
+  game.completedTricks = [];
+  game.trickNumber = 0;
+  game.roundNumber = 0;
+  game.redealCount = 0;
+  game.redealRequester = '';
+  game.redealResponses = new Map();
+  game.dealingRemainingMs = null;
+  game.lastRoundResults = undefined;
+  resetKlopf(game.klopf);
+  return null;
+}
+
 export function setStakes(game: GameData, stakes: number): string | null {
   if (game.state !== 'lobby') return GameErrors.WRONG_STATE;
   game.stakes = Math.max(0, stakes);
@@ -505,5 +542,6 @@ export function toGameStateInfo(game: GameData): GameStateInfo {
       winnerId: t.winnerId ?? '',
     })),
     phaseEndsAt: game.phaseEndsAt,
+    hostId: getHostId(game),
   };
 }

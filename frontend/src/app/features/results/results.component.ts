@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { GameStateService } from '../../core/services';
+import { GameStateService, SessionService, WebsocketService } from '../../core/services';
 
 @Component({
   selector: 'app-results',
@@ -82,25 +82,28 @@ import { GameStateService } from '../../core/services';
             }
           </ul>
 
-          <button class="btn btn-primary w-full" (click)="newGame()">
-            Neues Spiel
-          </button>
+          @if (gameState.isHost()) {
+            <button class="btn btn-primary w-full mb-2" (click)="restartGame()">Revanche</button>
+          } @else {
+            <p class="text-center text-base-content/70 mb-2">Warten auf Host...</p>
+          }
+          <button class="btn btn-ghost w-full" (click)="leave()">Zurück</button>
         </div>
       </div>
     </div>
   `
 })
 export class ResultsComponent {
-  constructor(
-    public gameState: GameStateService,
-    private router: Router
-  ) {}
+  private router = inject(Router);
+  private ws = inject(WebsocketService);
+  private session = inject(SessionService);
+  gameState = inject(GameStateService);
 
   getWinner() {
-    const winnerId = this.gameState.winnerId();
     const state = this.gameState.gameState();
-    if (!winnerId || !state) return null;
-    return state.players.find(p => p.id === winnerId) || null;
+    if (!state) return null;
+    const winnerId = this.gameState.winnerId();
+    return state.players.find(p => winnerId ? p.id === winnerId : p.lives > 0) || null;
   }
 
   getSortedPlayers() {
@@ -113,8 +116,14 @@ export class ResultsComponent {
     return Array(lives).fill(0);
   }
 
-  newGame(): void {
-    this.gameState.clearSession();
+  restartGame(): void {
+    this.ws.restartGame();
+  }
+
+  leave(): void {
+    const code = this.gameState.roomCode();
+    if (code) this.session.clear(code);
+    this.gameState.reset();
     this.router.navigate(['/']);
   }
 }

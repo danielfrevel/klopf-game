@@ -4,12 +4,14 @@ import { interval, map } from 'rxjs';
 import { WebsocketService, ServerMessage } from './websocket.service';
 import { Card, GameStateInfo, Player, RoundResult, GameState } from '@klopf/shared';
 import { LoggerService } from './logger.service';
+import { SessionService } from './session.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class GameStateService {
   private logger = inject(LoggerService);
+  private session = inject(SessionService);
 
   // Signals for reactive state
   private _roomCode = signal<string | null>(null);
@@ -73,11 +75,9 @@ export class GameStateService {
     if (!state) return [];
     return state.players.filter(p => p.id !== myId);
   });
-  readonly isOwner = computed(() => {
-    const state = this._gameState();
+  readonly isHost = computed(() => {
     const myId = this._playerId();
-    if (!state || !myId || state.players.length === 0) return false;
-    return state.players[0]?.id === myId; // First player is owner
+    return !!myId && this._gameState()?.hostId === myId;
   });
 
   constructor(private ws: WebsocketService) {
@@ -91,6 +91,7 @@ export class GameStateService {
       case 'room_created':
         this._roomCode.set(msg.roomCode || null);
         this._playerId.set(msg.playerId || null);
+        this.session.save(msg.roomCode, msg.playerId, msg.token);
         this.logger.info('GameState', 'Room joined', { roomCode: msg.roomCode, playerId: msg.playerId });
         break;
 
@@ -103,6 +104,7 @@ export class GameStateService {
           currentPlayerId: msg.state.currentPlayerId,
           trickCards: msg.state.currentTrick?.cards?.length || 0
         });
+        if (msg.state.state === 'lobby') this.resetRoundState();
         const myResponse = msg.state.klopf.responses?.find(r => r.playerId === this._playerId());
         this._klopfResponseNeeded.set(msg.state.state === 'klopf_pending' && myResponse?.mitgehen === null);
         break;
@@ -203,7 +205,6 @@ export class GameStateService {
 
       case 'room_closed':
         this.logger.warn('GameState', 'Room closed');
-        this.clearSession();
         break;
 
       default:
@@ -211,17 +212,24 @@ export class GameStateService {
     }
   }
 
-  clearSession(): void {
-    sessionStorage.removeItem('klopf_room');
-    sessionStorage.removeItem('klopf_player');
+  dismissRoundResults(): void {
+    this._roundResults.set(null);
+  }
+
+  reset(): void {
     this._roomCode.set(null);
     this._playerId.set(null);
     this._gameState.set(null);
+    this.resetRoundState();
+  }
+
+  private resetRoundState(): void {
     this._myCards.set([]);
     this._winnerId.set(null);
     this._perfectWin.set(false);
     this._winnings.set(0);
     this._roundResults.set(null);
+    this._klopfResponseNeeded.set(false);
     this._redealResponseNeeded.set(false);
     this._redealRequesterName.set(null);
   }
