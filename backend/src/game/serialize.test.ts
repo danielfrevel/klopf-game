@@ -3,11 +3,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { RoomData } from './types.js';
 import { cancelAllTimers, getCurrentPlayer, initiateGameKlopf, resumeTimers, respondToGameKlopf } from './game.js';
 import { RoomSnapshotSchema, fromSnapshot, toSnapshot } from './serialize.js';
-import { card, playTrick, setHands, startedGame } from './test-helpers.js';
-
-function roomOf(game: RoomData['game']): RoomData {
-  return { code: 'abc123', game, lobbyLeaveTimers: new Map() };
-}
+import { card, playTrick, roomOf, setHands, startedGame } from './test-helpers.js';
 
 function roundTrip(room: RoomData): RoomData {
   return fromSnapshot(JSON.parse(JSON.stringify(toSnapshot(room))));
@@ -29,7 +25,6 @@ describe('snapshot', () => {
     playTrick(game, [card('10', 'hearts')]);
     initiateGameKlopf(game, 'B');
     respondToGameKlopf(game, 'A', false);
-    game.redealResponses.set('C', true);
     const room = roomOf(game);
     expect(game.phaseTimer).not.toBeNull();
 
@@ -41,7 +36,6 @@ describe('snapshot', () => {
     cancelAllTimers(game);
     expect(restored.game.klopf.responses).toBeInstanceOf(Map);
     expect(restored.game.klopf.responses.get('A')).toBe(false);
-    expect(restored.game.redealResponses).toBeInstanceOf(Map);
     expect(restored.game.turnTimer).toBeNull();
     expect(restored.game.phaseTimer).toBeNull();
     expect(restored.game.players.every((p) => !p.connected)).toBe(true);

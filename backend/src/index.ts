@@ -2,8 +2,8 @@ import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { wsHandler } from './ws/handler.js';
 import { attachRoomCallbacks } from './ws/handlers/game.js';
-import { getRoom, removeRoom, restoreRoom } from './game/room.js';
-import { cancelAllTimers, resumeTimers } from './game/game.js';
+import { disposeRoom, getRoom, restoreRoom } from './game/room.js';
+import { resumeTimers } from './game/game.js';
 import { loadRooms, purgeOlderThan } from './persistence/db.js';
 import { log } from './utils/logger.js';
 
@@ -14,8 +14,7 @@ const PURGE_INTERVAL_MS = 60 * 60 * 1000;
 function purgeExpiredRooms(): void {
   for (const code of purgeOlderThan(ROOM_MAX_AGE_MS)) {
     const room = getRoom(code);
-    if (room) cancelAllTimers(room.game);
-    removeRoom(code);
+    if (room) disposeRoom(room);
     log.room.info(`Purged room ${code}`);
   }
 }

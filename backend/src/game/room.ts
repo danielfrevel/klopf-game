@@ -1,5 +1,5 @@
 import type { RoomData } from './types.js';
-import { createGame, getHostId } from './game.js';
+import { cancelAllTimers, createGame, getHostId } from './game.js';
 
 const rooms = new Map<string, RoomData>();
 
@@ -32,6 +32,13 @@ export function getRoom(code: string): RoomData | undefined {
 
 export function removeRoom(code: string): void {
   rooms.delete(code.toLowerCase());
+}
+
+export function disposeRoom(room: RoomData): void {
+  cancelAllTimers(room.game);
+  for (const timer of room.lobbyLeaveTimers.values()) clearTimeout(timer);
+  room.lobbyLeaveTimers.clear();
+  removeRoom(room.code);
 }
 
 export function isHost(room: RoomData, playerId: string): boolean {

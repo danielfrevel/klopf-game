@@ -49,7 +49,6 @@ export interface GameData {
   stakes: number;
   redealCount: number;
   redealRequester: string;
-  redealResponses: Map<string, boolean>;
   turnTimer: ReturnType<typeof setTimeout> | null;
   phaseTimer: ReturnType<typeof setTimeout> | null;
   phaseEndsAt: number | null;

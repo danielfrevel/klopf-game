@@ -3,12 +3,8 @@ import {
   GameErrors, blindDrei, initiateGameKlopf, requestRedeal, respondToGameKlopf,
   respondToRedeal, revealCards, startGame,
 } from './game.js';
-import { gameWithPlayers, player, startedGame } from './test-helpers.js';
+import { gameWithPlayers, ok, player, startedGame } from './test-helpers.js';
 import type { GameTimeouts } from './types.js';
-
-function ok(err: string | null): void {
-  expect(err).toBeNull();
-}
 
 function dealingGame(n: number, timeouts: Partial<GameTimeouts> = {}) {
   const game = gameWithPlayers(n, timeouts);

@@ -1,5 +1,6 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { first } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { WebsocketService, GameStateService } from '../../core/services';
@@ -74,11 +75,11 @@ export class StartComponent {
   createRoom(): void {
     const name = this.playerName.trim();
     if (!name) return;
-    const sub = this.ws.messages.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(msg => {
-      if (msg.type !== 'room_created') return;
-      sub.unsubscribe();
-      this.router.navigate(['/room', msg.roomCode]);
-    });
+    this.ws.messages
+      .pipe(first(msg => msg.type === 'room_created'), takeUntilDestroyed(this.destroyRef))
+      .subscribe(msg => {
+        if (msg.type === 'room_created') this.router.navigate(['/room', msg.roomCode]);
+      });
     this.ws.createRoom(name);
   }
 

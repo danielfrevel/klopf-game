@@ -1,18 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { GameErrors, getCurrentPlayerId, playCard, restartGame } from './game.js';
-import { card, playTrick, setHands, startedGame } from './test-helpers.js';
+import { card, playRoundAWinsAll, playTrick, setHands, startedGame } from './test-helpers.js';
 import type { GameState } from '@klopf/shared';
-import type { GameData } from './types.js';
 
-const A_WINS_ALL = [
-  [card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')],
-  [card('J', 'hearts'), card('Q', 'hearts'), card('K', 'hearts'), card('A', 'hearts')],
-];
-
-function playRoundAWinsAll(game: GameData): void {
-  const [a, b] = A_WINS_ALL;
-  for (let i = 0; i < 4; i++) playTrick(game, [a[i], b[i]]);
-}
 
 describe('characterization', () => {
   test('must follow lead suit when possible', () => {
@@ -47,7 +37,6 @@ describe('characterization', () => {
 
   test('round loser loses 1 life', () => {
     const game = startedGame(2);
-    setHands(game, A_WINS_ALL);
     playRoundAWinsAll(game);
     expect(game.players[0].lives).toBe(7);
     expect(game.players[1].lives).toBe(6);
@@ -57,7 +46,6 @@ describe('characterization', () => {
   test('game over when only one player has lives left', () => {
     const game = startedGame(2);
     game.players[1].lives = 1;
-    setHands(game, A_WINS_ALL);
     playRoundAWinsAll(game);
     expect(game.players[1].lives).toBe(0);
     expect(game.state).toBe('game_over');

@@ -1,4 +1,4 @@
-import type { GameStateInfo, RoundResult } from '@klopf/shared';
+import type { Card, GameStateInfo, RoundResult } from '@klopf/shared';
 import {
   INITIAL_LIVES,
   MIN_PLAYERS,
@@ -8,7 +8,7 @@ import {
   TRICKS_PER_ROUND,
   DEFAULT_STAKES,
 } from '@klopf/shared';
-import type { GameData, GameTimeouts, PhaseKind, PlayerState } from './types.js';
+import type { GameData, GameTimeouts, PhaseKind, PlayerState, TrickState } from './types.js';
 import { hasCard, removeCard, getCardsOfSuit, isAlive, isActive, loseLives, toPlayerInfo } from './player.js';
 import { createDeck, shuffleDeck, dealCards } from './deck.js';
 import { createTrick, addCardToTrick, isTrickComplete, determineTrickWinner, toTrickInfo } from './trick.js';
@@ -56,7 +56,6 @@ export function createGame(timeouts: GameTimeouts = DEFAULT_TIMEOUTS): GameData 
     stakes: DEFAULT_STAKES,
     redealCount: 0,
     redealRequester: '',
-    redealResponses: new Map(),
     turnTimer: null,
     phaseTimer: null,
     phaseEndsAt: null,
@@ -115,13 +114,19 @@ function dealHands(game: GameData): void {
   shuffleDeck(deck);
 
   for (const player of game.players) {
-    player.folded = false;
-    player.revealed = false;
-    player.roundLivesLost = 0;
+    resetPlayerForRound(player);
     player.mustMitgehen = player.lives === 1;
     player.hand = isAlive(player) ? dealCards(deck, CARDS_PER_PLAYER) : [];
   }
   game.currentTrick = createTrick();
+}
+
+function resetPlayerForRound(player: PlayerState): void {
+  player.folded = false;
+  player.revealed = false;
+  player.roundLivesLost = 0;
+  player.mustMitgehen = false;
+  player.hand = [];
 }
 
 function tryAutoKlopf(game: GameData): boolean {
@@ -284,10 +289,7 @@ export function playCard(game: GameData, playerId: string, cardId: string): stri
   if (!hasCard(player, cardId) || !game.currentTrick) return GameErrors.CARD_NOT_IN_HAND;
 
   const trick = game.currentTrick;
-  const cardToPlay = player.hand.find((c) => c.id === cardId)!;
-  if (trick.cards.length > 0 && trick.leadSuit && cardToPlay.suit !== trick.leadSuit) {
-    if (getCardsOfSuit(player, trick.leadSuit).length > 0) return GameErrors.MUST_FOLLOW_SUIT;
-  }
+  if (!playableCards(player, trick).some((c) => c.id === cardId)) return GameErrors.MUST_FOLLOW_SUIT;
 
   addCardToTrick(trick, playerId, removeCard(player, cardId)!);
   cancelPlayerTimer(game);
@@ -306,16 +308,16 @@ export function playRandomCard(game: GameData, playerId: string): string | null 
   const player = getPlayer(game, playerId);
   if (!player || player.hand.length === 0) return null;
 
-  let validCards = player.hand;
-  const leadSuit = game.currentTrick?.leadSuit;
-  if (game.currentTrick && game.currentTrick.cards.length > 0 && leadSuit) {
-    const suitCards = getCardsOfSuit(player, leadSuit);
-    if (suitCards.length > 0) validCards = suitCards;
-  }
-
+  const validCards = game.currentTrick ? playableCards(player, game.currentTrick) : player.hand;
   const card = validCards[Math.floor(Math.random() * validCards.length)];
   const err = playCard(game, playerId, card.id);
   return err ? null : card.id;
+}
+
+function playableCards(player: PlayerState, trick: TrickState): Card[] {
+  if (trick.cards.length === 0 || !trick.leadSuit) return player.hand;
+  const suitCards = getCardsOfSuit(player, trick.leadSuit);
+  return suitCards.length > 0 ? suitCards : player.hand;
 }
 
 function completeTrick(game: GameData): void {
@@ -395,27 +397,13 @@ export function restartGame(game: GameData): string | null {
   if (game.state !== 'game_over') return GameErrors.WRONG_STATE;
 
   cancelAllTimers(game);
-  game.players = game.players.filter((p) => p.connected);
-  for (const player of game.players) {
+  const players = game.players.filter((p) => p.connected);
+  for (const player of players) {
+    resetPlayerForRound(player);
     player.lives = INITIAL_LIVES;
-    player.hand = [];
-    player.folded = false;
-    player.revealed = false;
-    player.roundLivesLost = 0;
-    player.mustMitgehen = false;
   }
-  game.state = 'lobby';
-  game.currentPlayerIndex = 0;
-  game.currentTrick = null;
-  game.completedTricks = [];
-  game.trickNumber = 0;
-  game.roundNumber = 0;
-  game.redealCount = 0;
-  game.redealRequester = '';
-  game.redealResponses = new Map();
-  game.dealingRemainingMs = null;
-  game.lastRoundResults = undefined;
-  resetKlopf(game.klopf);
+  const { stakes, onTimeout, onPhaseExpired } = game;
+  Object.assign(game, createGame(game.timeouts), { players, stakes, onTimeout, onPhaseExpired });
   return null;
 }
 
@@ -433,7 +421,6 @@ export function requestRedeal(game: GameData, playerId: string): string | null {
 
   game.dealingRemainingMs = Math.max(0, (game.phaseEndsAt ?? Date.now()) - Date.now());
   game.redealRequester = playerId;
-  game.redealResponses = new Map();
   game.state = 'redeal_pending';
   startRedealTimer(game);
   return null;
@@ -451,11 +438,9 @@ export function respondToRedeal(game: GameData, playerId: string, agree: boolean
   if (game.state !== 'redeal_pending') return GameErrors.WRONG_STATE;
   if (playerId === game.redealRequester) return null;
 
-  game.redealResponses.set(playerId, agree);
   const remainingMs = game.dealingRemainingMs ?? game.timeouts.dealingMs;
   game.dealingRemainingMs = null;
   game.redealRequester = '';
-  game.redealResponses = new Map();
 
   if (agree) {
     game.redealCount++;

@@ -1,17 +1,14 @@
 import type { ServerWebSocket } from 'bun';
 import type { WsData } from '../handler.js';
-import { getRoom } from '../../game/room.js';
 import { requestRedeal, respondToRedeal, getRedealInfo, activePlayers } from '../../game/game.js';
-import { getPlayerId, getPlayerRoom } from '../connections.js';
-import { sendError, sendToPlayer, broadcastToRoom, broadcastGameState } from '../broadcast.js';
+import { sendError, sendToPlayer, broadcastToRoom, commitRoom } from '../broadcast.js';
 import { sendCards } from './game.js';
+import { senderRoom } from '../context.js';
 
 export function handleRequestRedeal(ws: ServerWebSocket<WsData>): void {
-  const playerId = getPlayerId(ws);
-  const roomCode = getPlayerRoom(playerId);
-
-  const room = getRoom(roomCode);
-  if (!room) { sendError(ws, 'Room not found'); return; }
+  const ctx = senderRoom(ws);
+  if (!ctx) return;
+  const { playerId, room } = ctx;
 
   const err = requestRedeal(room.game, playerId);
   if (err) { sendError(ws, err); return; }
@@ -26,11 +23,9 @@ export function handleRequestRedeal(ws: ServerWebSocket<WsData>): void {
 }
 
 export function handleRedealResponse(ws: ServerWebSocket<WsData>, agree: boolean): void {
-  const playerId = getPlayerId(ws);
-  const roomCode = getPlayerRoom(playerId);
-
-  const room = getRoom(roomCode);
-  if (!room) { sendError(ws, 'Room not found'); return; }
+  const ctx = senderRoom(ws);
+  if (!ctx) return;
+  const { playerId, room } = ctx;
 
   const err = respondToRedeal(room.game, playerId, agree);
   if (err) { sendError(ws, err); return; }
@@ -43,5 +38,5 @@ export function handleRedealResponse(ws: ServerWebSocket<WsData>, agree: boolean
     broadcastToRoom(room, { type: 'redeal_declined' });
   }
 
-  broadcastGameState(room);
+  commitRoom(room);
 }

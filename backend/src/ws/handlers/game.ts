@@ -3,13 +3,11 @@ import type { Card } from '@klopf/shared';
 import { INITIAL_LIVES } from '@klopf/shared';
 import type { WsData } from '../handler.js';
 import type { RoomData } from '../../game/types.js';
-import { getRoom, isHost } from '../../game/room.js';
 import {
   startGame, playCard, playRandomCard, setStakes, getPlayer, getWinner, activePlayers, revealCards, restartGame,
 } from '../../game/game.js';
-import { getPlayerId, getPlayerRoom } from '../connections.js';
-import { sendError, sendToPlayer, broadcastToRoom, broadcastGameState } from '../broadcast.js';
-import { saveRoom } from '../../persistence/db.js';
+import { sendError, sendToPlayer, broadcastToRoom, commitRoom } from '../broadcast.js';
+import { hostRoom, senderRoom } from '../context.js';
 import { log } from '../../utils/logger.js';
 
 export function attachRoomCallbacks(room: RoomData): void {
@@ -20,13 +18,11 @@ export function attachRoomCallbacks(room: RoomData): void {
     const cardId = playRandomCard(room.game, playerId);
     if (!cardId) return;
     processCardPlayed(room, playerId, handBefore.find((c) => c.id === cardId));
-    saveRoom(room);
   };
   room.game.onPhaseExpired = (kind) => {
     if (kind === 'klopf') broadcastToRoom(room, { type: 'klopf_resolved', level: room.game.klopf.level });
     if (kind === 'redeal') broadcastToRoom(room, { type: 'redeal_declined' });
     finishAction(room);
-    saveRoom(room);
   };
 }
 
@@ -60,18 +56,13 @@ export function finishAction(room: RoomData): void {
     return;
   }
 
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function handleStartGame(ws: ServerWebSocket<WsData>): void {
-  const playerId = getPlayerId(ws);
-  const room = getRoom(getPlayerRoom(playerId));
-  if (!room) { sendError(ws, 'Room not found'); return; }
-
-  if (!isHost(room, playerId)) {
-    sendError(ws, 'Only the host can start the game');
-    return;
-  }
+  const ctx = hostRoom(ws, 'start the game');
+  if (!ctx) return;
+  const { room } = ctx;
 
   const err = startGame(room.game);
   if (err) { sendError(ws, err); return; }
@@ -80,18 +71,18 @@ export function handleStartGame(ws: ServerWebSocket<WsData>): void {
   broadcastToRoom(room, { type: 'game_started' });
   sendCards(room);
   if (room.game.state === 'klopf_pending') notifyKlopf(room);
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function handleRevealCards(ws: ServerWebSocket<WsData>): void {
-  const playerId = getPlayerId(ws);
-  const room = getRoom(getPlayerRoom(playerId));
-  if (!room) { sendError(ws, 'Room not found'); return; }
+  const ctx = senderRoom(ws);
+  if (!ctx) return;
+  const { playerId, room } = ctx;
 
   const err = revealCards(room.game, playerId);
   if (err) { sendError(ws, err); return; }
 
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function processCardPlayed(room: RoomData, playerId: string, playedCard: Card | undefined): void {
@@ -118,13 +109,13 @@ export function broadcastGameOver(room: RoomData): void {
       winnings,
     });
   }
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function handlePlayCard(ws: ServerWebSocket<WsData>, cardId: string): void {
-  const playerId = getPlayerId(ws);
-  const room = getRoom(getPlayerRoom(playerId));
-  if (!room) { sendError(ws, 'Room not found'); return; }
+  const ctx = senderRoom(ws);
+  if (!ctx) return;
+  const { playerId, room } = ctx;
 
   const player = getPlayer(room.game, playerId);
   if (!player) { sendError(ws, 'Player not found'); return; }
@@ -138,33 +129,23 @@ export function handlePlayCard(ws: ServerWebSocket<WsData>, cardId: string): voi
 }
 
 export function handleRestartGame(ws: ServerWebSocket<WsData>): void {
-  const playerId = getPlayerId(ws);
-  const room = getRoom(getPlayerRoom(playerId));
-  if (!room) { sendError(ws, 'Room not found'); return; }
-
-  if (!isHost(room, playerId)) {
-    sendError(ws, 'Only the host can start a revanche');
-    return;
-  }
+  const ctx = hostRoom(ws, 'start a revanche');
+  if (!ctx) return;
+  const { room } = ctx;
 
   const err = restartGame(room.game);
   if (err) { sendError(ws, err); return; }
 
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function handleSetStakes(ws: ServerWebSocket<WsData>, stakes: number): void {
-  const playerId = getPlayerId(ws);
-  const room = getRoom(getPlayerRoom(playerId));
-  if (!room) { sendError(ws, 'Room not found'); return; }
-
-  if (!isHost(room, playerId)) {
-    sendError(ws, 'Only the host can set stakes');
-    return;
-  }
+  const ctx = hostRoom(ws, 'set stakes');
+  if (!ctx) return;
+  const { room } = ctx;
 
   const err = setStakes(room.game, stakes);
   if (err) { sendError(ws, err); return; }
 
-  broadcastGameState(room);
+  commitRoom(room);
 }

@@ -42,7 +42,6 @@ const GameSnapshotSchema = Type.Object({
   stakes: Type.Number(),
   redealCount: Type.Number(),
   redealRequester: Type.String(),
-  redealResponses: Entries,
   phaseEndsAt: Type.Union([Type.Number(), Type.Null()]),
   dealingRemainingMs: Type.Union([Type.Number(), Type.Null()]),
   timeouts: Type.Object({
@@ -69,9 +68,7 @@ export function toSnapshot(room: RoomData): RoomSnapshot {
     code: room.code,
     game: {
       ...game,
-      players: game.players.map((p) => ({ ...p })),
       klopf: { ...game.klopf, responses: [...game.klopf.responses] },
-      redealResponses: [...game.redealResponses],
     },
   };
 }
@@ -87,7 +84,6 @@ export function fromSnapshot(snapshot: RoomSnapshot): RoomData {
       completedTricks: game.completedTricks as TrickState[],
       players: game.players.map((p) => ({ ...p, connected: false })),
       klopf: { ...game.klopf, responses: new Map(game.klopf.responses) },
-      redealResponses: new Map(game.redealResponses),
       turnTimer: null,
       phaseTimer: null,
     },

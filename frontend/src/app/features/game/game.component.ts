@@ -104,13 +104,13 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
           <div class="card bg-base-100 shadow-sm p-4 max-w-2xl mx-auto w-full text-center">
             <p class="font-bold">Austeilphase: noch {{ gameState.phaseSecondsLeft() }} s</p>
             <ul class="flex flex-wrap justify-center gap-2 mt-2">
-              @for (player of activePlayers(); track player.id) {
+              @for (player of gameState.activePlayers(); track player.id) {
                 <li class="badge" [class.badge-success]="player.revealed" [class.badge-ghost]="!player.revealed">
                   {{ player.name }}: {{ player.revealed ? 'aufgedeckt' : 'verdeckt' }}
                 </li>
               }
             </ul>
-            @if (!gameState.me()?.revealed && isActive()) {
+            @if (!gameState.me()?.revealed && gameState.isActive()) {
               <div class="flex justify-center gap-4 mt-4">
                 <button class="btn btn-primary" (click)="revealCards()">Aufdecken</button>
                 <button class="btn btn-warning" (click)="blindDrei()">Blind auf 3</button>
@@ -212,7 +212,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
               möchte neue Karten austeilen.
             </p>
             <p class="text-sm text-base-content/70 mb-4">
-              Bereits {{ gameState.gameState()?.redealCount || 0 }} von {{ gameState.gameState()?.maxRedeals || 3 }} Einigungen verwendet.
+              Bereits {{ gameState.gameState()?.redealCount || 0 }} von {{ gameState.gameState()?.maxRedeals }} Einigungen verwendet.
             </p>
             <div class="modal-action">
               <button class="btn btn-error" (click)="respondToRedeal(false)">Ablehnen</button>
@@ -298,17 +298,10 @@ export class GameComponent implements OnInit, OnDestroy {
     }
   }
 
-  activePlayers = computed(() => (this.gameState.gameState()?.players ?? []).filter(p => p.lives > 0 && !p.folded));
-
-  isActive(): boolean {
-    const me = this.gameState.me();
-    return !!me && me.lives > 0 && !me.folded;
-  }
-
   canKlopf(): boolean {
     const state = this.gameState.gameState();
     if (!state || (state.state !== 'playing' && state.state !== 'dealing')) return false;
-    return this.isActive() && state.klopf.lastKlopper !== this.gameState.playerId();
+    return this.gameState.isActive() && state.klopf.lastKlopper !== this.gameState.playerId();
   }
 
   revealCards(): void {
@@ -358,7 +351,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   getRedealInfo(): string {
     const state = this.gameState.gameState();
-    const remaining = (state?.maxRedeals || 3) - (state?.redealCount || 0);
+    const remaining = (state?.maxRedeals ?? 0) - (state?.redealCount ?? 0);
     return `${remaining} übrig`;
   }
 

@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { openRoomStore } from './db.js';
 import { createGame } from '../game/game.js';
-import type { RoomData } from '../game/types.js';
+import { roomOf } from '../game/test-helpers.js';
 
-function room(code: string): RoomData {
-  return { code, game: createGame(), lobbyLeaveTimers: new Map() };
+function room(code: string) {
+  return roomOf(createGame(), code);
 }
 
 test('save, load, overwrite and delete rooms', () => {

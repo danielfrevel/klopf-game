@@ -3,27 +3,13 @@ import {
   GameErrors, getCurrentPlayerId, initiateGameKlopf, playCard, playRandomCard,
   respondToGameKlopf, startPlaying, toGameStateInfo,
 } from './game.js';
-import { card, player, playTrick, setHands, startedGame } from './test-helpers.js';
+import { card, ok, player, playRoundAWinsAll, playTrick, setHands, startedGame } from './test-helpers.js';
 import type { Card } from '@klopf/shared';
 import type { GameData } from './types.js';
-
-function ok(err: string | null): void {
-  expect(err).toBeNull();
-}
-
-const A_WINS_ALL: Card[][] = [
-  [card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')],
-  [card('J', 'hearts'), card('Q', 'hearts'), card('K', 'hearts'), card('A', 'hearts')],
-];
 
 function playRound(game: GameData, hands: Card[][], order: Card[][]): void {
   setHands(game, hands);
   for (const trick of order) playTrick(game, trick);
-}
-
-function playRoundAWinsAll(game: GameData): void {
-  const [a, b] = A_WINS_ALL;
-  playRound(game, A_WINS_ALL, a.map((c, i) => [c, b[i]]));
 }
 
 describe('klopf and lives', () => {

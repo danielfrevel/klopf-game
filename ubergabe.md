@@ -84,7 +84,7 @@ Am Rundenende schreibt `endRound` die Ergebnisse nach `game.lastRoundResults`. D
 
 #### `game/room.ts`
 
-Module-level `Map<string, RoomData>` als Cache. `createRoom()`, `getRoom()`, `removeRoom()`, `restoreRoom()`, `isHost()`.
+Module-level `Map<string, RoomData>` als Cache. `createRoom()`, `getRoom()`, `removeRoom()`, `restoreRoom()`, `disposeRoom()` (Timer stoppen und aus dem Cache nehmen), `isHost()`.
 
 #### `persistence/db.ts`
 
@@ -92,9 +92,10 @@ Module-level `Map<string, RoomData>` als Cache. `createRoom()`, `getRoom()`, `re
 
 #### `ws/`
 
-- `handler.ts`: Elysia-WS-Setup, Message-Router, speichert nach jeder Nachricht den Raum
+- `handler.ts`: Elysia-WS-Setup und Message-Router
+- `context.ts`: `senderRoom(ws)` und `hostRoom(ws, action)` lösen Spieler und Raum einer Nachricht auf und senden sonst den Fehler
 - `connections.ts`: Verbindungs-Tracking (connId, playerId, roomCode). Ein alter Socket räumt beim Schließen nur seine eigenen Einträge ab
-- `broadcast.ts`: `send()`, `sendError(ws, error, code?)`, `broadcastToRoom()`, `broadcastGameState()`
+- `broadcast.ts`: `send()`, `sendError(ws, error, code?)`, `broadcastToRoom()`, `commitRoom()`. `commitRoom` sendet den GameState an alle und speichert den Raum. Jede erfolgreiche Änderung endet dort
 - `handlers/room.ts`: create, join, reconnect, close, disconnect, Lobby-Frist
 - `handlers/game.ts`: start, reveal, play_card, stakes, restart. `finishAction(room)` sendet nach jeder Aktion Rundenergebnis, neue Karten, Auto-Klopf, Game Over und GameState. `attachRoomCallbacks(room)` verdrahtet die Timer mit dem Handler-Layer
 - `handlers/klopf.ts`: klopf, klopf_response, blind_drei
@@ -106,7 +107,7 @@ Module-level `Map<string, RoomData>` als Cache. `createRoom()`, `getRoom()`, `re
 - `app.ts`: öffnet die WebSocket-Verbindung einmal beim App-Start
 - `core/services/websocket.service.ts`: WebSocket, Nachrichten als Observable, Reconnect mit exponentiellem Backoff (30 Versuche, maximal 30 s)
 - `core/services/session.service.ts`: Session je Raum in localStorage
-- `core/services/game-state.service.ts`: Signals-basierter State. `klopfResponseNeeded` kommt aus `game_state.klopf.responses` und `klopf_response_needed`, `phaseSecondsLeft` aus `phaseEndsAt`
+- `core/services/game-state.service.ts`: Signals-basierter State. `klopfResponseNeeded` und `activePlayers` sind aus `game_state` abgeleitet. `phaseSecondsLeft` tickt nur, solange `phaseEndsAt` gesetzt ist
 - `features/start/`: Name, Raum erstellen, Code eingeben
 - `features/room/`: Shell für `/room/:code`, zeigt je nach State Lobby, Spiel oder Ergebnis. Kümmert sich um Reconnect und Beitritt
 - `features/lobby/`, `features/game/`, `features/results/`: die drei Ansichten im Raum
@@ -210,7 +211,7 @@ game_over      ──restart_game────────────► lobby
 
 - SQLite über `bun:sqlite`, Tabelle `rooms(code, data, updated_at)`, ein JSON-Snapshot je Raum, WAL-Modus
 - Pfad: `DB_PATH`, Standard `data/klopf.sqlite` relativ zum Arbeitsverzeichnis (lokal `backend/data/`, in Git ignoriert). Docker nutzt `/app/data/klopf.sqlite` im Volume `klopf-data`
-- Der Server speichert nach jeder Client-Nachricht, nach jedem Timer-Ablauf und nach dem Lobby-Rauswurf. `close_room` löscht den Raum
+- Der Server speichert in `commitRoom`, also nach jeder erfolgreichen Änderung, egal ob sie von einer Nachricht oder einem Timer kommt. Abgelehnte Nachrichten schreiben nichts. `close_room` löscht den Raum
 - Beim Start löscht der Server Räume, die länger als 24 h unverändert sind, lädt den Rest und setzt die Timer mit der Restzeit wieder auf. Danach läuft der Purge stündlich
 - Details: ADR 0003
 

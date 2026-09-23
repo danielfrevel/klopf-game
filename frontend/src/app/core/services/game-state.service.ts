@@ -1,6 +1,6 @@
 import { Injectable, computed, signal, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { interval, map } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { map, of, switchMap, timer } from 'rxjs';
 import { WebsocketService, ServerMessage } from './websocket.service';
 import { Card, GameStateInfo, Player, RoundResult, GameState } from '@klopf/shared';
 import { LoggerService } from './logger.service';
@@ -19,7 +19,6 @@ export class GameStateService {
   private _gameState = signal<GameStateInfo | null>(null);
   private _myCards = signal<Card[]>([]);
   private _lastPlayedCard = signal<{ playerId: string; card: Card } | null>(null);
-  private _klopfResponseNeeded = signal<boolean>(false);
   private _redealResponseNeeded = signal<boolean>(false);
   private _redealRequesterName = signal<string | null>(null);
   private _roundResults = signal<RoundResult[] | null>(null);
@@ -34,7 +33,6 @@ export class GameStateService {
   readonly gameState = this._gameState.asReadonly();
   readonly myCards = this._myCards.asReadonly();
   readonly lastPlayedCard = this._lastPlayedCard.asReadonly();
-  readonly klopfResponseNeeded = this._klopfResponseNeeded.asReadonly();
   readonly redealResponseNeeded = this._redealResponseNeeded.asReadonly();
   readonly redealRequesterName = this._redealRequesterName.asReadonly();
   readonly roundResults = this._roundResults.asReadonly();
@@ -43,12 +41,24 @@ export class GameStateService {
   readonly winnings = this._winnings.asReadonly();
   readonly error = this._error.asReadonly();
 
-  private readonly now = toSignal(interval(1000).pipe(map(() => Date.now())), { initialValue: Date.now() });
-  readonly phaseEndsAt = computed(() => this._gameState()?.phaseEndsAt ?? null);
-  readonly phaseSecondsLeft = computed(() => {
-    const endsAt = this.phaseEndsAt();
-    if (endsAt === null) return null;
-    return Math.max(0, Math.ceil((endsAt - this.now()) / 1000));
+  private readonly phaseEndsAt = computed(() => this._gameState()?.phaseEndsAt ?? null);
+  readonly phaseSecondsLeft = toSignal(
+    toObservable(this.phaseEndsAt).pipe(
+      switchMap(endsAt => endsAt === null
+        ? of(null)
+        : timer(0, 1000).pipe(map(() => Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))))),
+    ),
+    { initialValue: null },
+  );
+  readonly klopfResponseNeeded = computed(() => {
+    const state = this._gameState();
+    const myResponse = state?.klopf.responses?.find(r => r.playerId === this._playerId());
+    return state?.state === 'klopf_pending' && myResponse?.mitgehen === null;
+  });
+  readonly activePlayers = computed(() => (this._gameState()?.players ?? []).filter(p => p.lives > 0 && !p.folded));
+  readonly isActive = computed(() => {
+    const me = this.me();
+    return !!me && me.lives > 0 && !me.folded;
   });
 
   // Computed values
@@ -105,8 +115,6 @@ export class GameStateService {
           trickCards: msg.state.currentTrick?.cards?.length || 0
         });
         if (msg.state.state === 'lobby') this.resetRoundState();
-        const myResponse = msg.state.klopf.responses?.find(r => r.playerId === this._playerId());
-        this._klopfResponseNeeded.set(msg.state.state === 'klopf_pending' && myResponse?.mitgehen === null);
         break;
       }
 
@@ -140,12 +148,10 @@ export class GameStateService {
         break;
 
       case 'klopf_response_needed':
-        this._klopfResponseNeeded.set(true);
         this.logger.info('GameState', 'Klopf response needed');
         break;
 
       case 'klopf_resolved':
-        this._klopfResponseNeeded.set(false);
         this.logger.info('GameState', 'Klopf resolved');
         break;
 
@@ -229,7 +235,6 @@ export class GameStateService {
     this._perfectWin.set(false);
     this._winnings.set(0);
     this._roundResults.set(null);
-    this._klopfResponseNeeded.set(false);
     this._redealResponseNeeded.set(false);
     this._redealRequesterName.set(null);
   }

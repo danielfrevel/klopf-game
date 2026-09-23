@@ -2,12 +2,13 @@ import type { ServerWebSocket } from 'bun';
 import { MAX_REDEALS } from '@klopf/shared';
 import type { WsData } from '../handler.js';
 import type { PlayerState, RoomData } from '../../game/types.js';
-import { createRoom, getRoom, removeRoom, isHost } from '../../game/room.js';
+import { createRoom, getRoom, removeRoom, disposeRoom } from '../../game/room.js';
 import { createPlayer, isActive, toPlayerInfo } from '../../game/player.js';
-import { addPlayer, getPlayer, removePlayer, toGameStateInfo, cancelAllTimers, GameErrors } from '../../game/game.js';
-import { registerConnection, getPlayerId, getPlayerRoom, removeConnection, removePlayerRoom } from '../connections.js';
-import { send, sendError, broadcastToRoom, broadcastGameState } from '../broadcast.js';
-import { deleteRoom, saveRoom } from '../../persistence/db.js';
+import { addPlayer, getPlayer, removePlayer, GameErrors } from '../../game/game.js';
+import { registerConnection, removeConnection, removePlayerRoom } from '../connections.js';
+import { send, sendError, broadcastToRoom, commitRoom } from '../broadcast.js';
+import { deleteRoom } from '../../persistence/db.js';
+import { hostRoom } from '../context.js';
 import { log } from '../../utils/logger.js';
 
 const MAX_NAME_LENGTH = 20;
@@ -37,7 +38,7 @@ export function handleCreateRoom(ws: ServerWebSocket<WsData>, playerName: string
     removeRoom(room.code);
     return;
   }
-  send(ws, { type: 'game_state', state: toGameStateInfo(room.game) });
+  commitRoom(room);
 }
 
 export function handleJoinRoom(ws: ServerWebSocket<WsData>, roomCode: string, playerName: string): void {
@@ -51,7 +52,7 @@ export function handleJoinRoom(ws: ServerWebSocket<WsData>, roomCode: string, pl
   if (!player) return;
 
   broadcastToRoom(room, { type: 'player_joined', player: toPlayerInfo(player) });
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, playerId: string, token: string): void {
@@ -74,7 +75,6 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
   log.room.info(`Player ${player.name} reconnected to room ${room.code} (state: ${room.game.state})`);
 
   send(ws, { type: 'room_created', roomCode: room.code, playerId, token });
-  send(ws, { type: 'game_state', state: toGameStateInfo(room.game) });
 
   if (room.game.state !== 'lobby') {
     send(ws, { type: 'cards_dealt', cards: player.hand });
@@ -88,13 +88,13 @@ export function handleReconnect(ws: ServerWebSocket<WsData>, roomCode: string, p
   }
 
   if (room.game.state === 'redeal_pending') {
-    if (player.id !== room.game.redealRequester && !room.game.redealResponses.has(player.id)) {
+    if (player.id !== room.game.redealRequester) {
       send(ws, { type: 'redeal_response_needed', redealCount: room.game.redealCount, maxRedeals: MAX_REDEALS });
     }
   }
 
   broadcastToRoom(room, { type: 'player_joined', player: toPlayerInfo(player) });
-  broadcastGameState(room);
+  commitRoom(room);
 }
 
 export function handleDisconnect(ws: ServerWebSocket<WsData>): void {
@@ -107,7 +107,7 @@ export function handleDisconnect(ws: ServerWebSocket<WsData>): void {
 
   player.connected = false;
   broadcastToRoom(room, { type: 'player_left', playerId: player.id });
-  broadcastGameState(room);
+  commitRoom(room);
 
   if (room.game.state === 'lobby') {
     room.lobbyLeaveTimers.set(player.id, setTimeout(() => leaveLobby(room, player.id), room.game.timeouts.lobbyLeaveMs));
@@ -124,38 +124,23 @@ function leaveLobby(room: RoomData, playerId: string): void {
   log.room.info(`Player ${player.name} left room ${room.code} after lobby grace period`);
 
   if (room.game.players.length === 0) {
-    removeRoom(room.code);
+    disposeRoom(room);
     deleteRoom(room.code);
     return;
   }
   broadcastToRoom(room, { type: 'player_left', playerId });
-  broadcastGameState(room);
-  saveRoom(room);
+  commitRoom(room);
 }
 
 export function handleCloseRoom(ws: ServerWebSocket<WsData>): void {
-  const playerId = getPlayerId(ws);
-  const roomCode = getPlayerRoom(playerId);
+  const ctx = hostRoom(ws, 'close the room');
+  if (!ctx) return;
+  const { room } = ctx;
 
-  const room = getRoom(roomCode);
-  if (!room) {
-    sendError(ws, 'Room not found', 'room_not_found');
-    return;
-  }
-
-  if (!isHost(room, playerId)) {
-    sendError(ws, 'Only the host can close the room');
-    return;
-  }
-
-  cancelAllTimers(room.game);
-  for (const timer of room.lobbyLeaveTimers.values()) clearTimeout(timer);
   broadcastToRoom(room, { type: 'room_closed' });
-
   for (const player of room.game.players) {
     removePlayerRoom(player.id);
   }
-
-  removeRoom(roomCode);
+  disposeRoom(room);
   deleteRoom(room.code);
 }

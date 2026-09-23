@@ -1,5 +1,6 @@
+import { expect } from 'bun:test';
 import type { Card, Rank, Suit } from '@klopf/shared';
-import type { GameData, GameTimeouts } from './types.js';
+import type { GameData, GameTimeouts, RoomData } from './types.js';
 import { createCard } from './card.js';
 import { createPlayer } from './player.js';
 import { addPlayer, createGame, getCurrentPlayerId, playCard, startGame, startPlaying, DEFAULT_TIMEOUTS } from './game.js';
@@ -45,4 +46,23 @@ export function playTrick(game: GameData, cards: Card[]): void {
     const err = playCard(game, playerId, c.id);
     if (err) throw new Error(`${playerId} ${c.id}: ${err}`);
   }
+}
+
+export function ok(err: string | null): void {
+  expect(err).toBeNull();
+}
+
+export function roomOf(game: GameData, code = 'abc123'): RoomData {
+  return { code, game, lobbyLeaveTimers: new Map() };
+}
+
+export const A_WINS_ALL: Card[][] = [
+  [card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')],
+  [card('J', 'hearts'), card('Q', 'hearts'), card('K', 'hearts'), card('A', 'hearts')],
+];
+
+export function playRoundAWinsAll(game: GameData): void {
+  const [a, b] = A_WINS_ALL;
+  setHands(game, A_WINS_ALL);
+  a.forEach((c, i) => playTrick(game, [c, b[i]]));
 }

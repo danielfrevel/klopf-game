@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MAX_PLAYERS } from '@klopf/shared';
 import { WebsocketService, GameStateService } from '../../core/services';
 
 @Component({
@@ -48,7 +49,7 @@ import { WebsocketService, GameStateService } from '../../core/services';
           </ul>
 
           <p class="text-center text-sm text-base-content/70 mb-4">
-            {{ gameState.gameState()?.players?.length || 0 }}/4 Spieler
+            {{ gameState.gameState()?.players?.length || 0 }}/{{ maxPlayers }} Spieler
             (mind. 2 zum Starten)
           </p>
 
@@ -116,6 +117,7 @@ export class LobbyComponent {
 
   stakes = this.gameState.gameState()?.stakes ?? 0;
   copied = signal(false);
+  readonly maxPlayers = MAX_PLAYERS;
 
   startGame(): void {
     this.ws.startGame();
