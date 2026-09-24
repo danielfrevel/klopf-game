@@ -21,6 +21,7 @@ const PlayerSnapshotSchema = Type.Object({
   folded: Type.Boolean(),
   revealed: Type.Boolean(),
   roundLivesLost: Type.Number(),
+  autoKlopfDone: Type.Boolean(),
 });
 
 const GameSnapshotSchema = Type.Object({

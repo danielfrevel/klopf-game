@@ -14,6 +14,7 @@ export function createPlayer(id: string, name: string): PlayerState {
     folded: false,
     revealed: false,
     roundLivesLost: 0,
+    autoKlopfDone: false,
   };
 }
 

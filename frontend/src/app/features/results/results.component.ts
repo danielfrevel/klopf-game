@@ -77,6 +77,9 @@ import { GameStateService, SessionService, WebsocketService } from '../../core/s
                   @if (player.lives === 0) {
                     <span class="text-base-content/50">Ausgeschieden</span>
                   }
+                  @if (!player.connected) {
+                    <span class="badge badge-ghost badge-sm ml-1">nicht mehr da</span>
+                  }
                 </div>
               </li>
             }

@@ -17,14 +17,14 @@ Kartenspiel für 2 bis 4 Spieler im Browser. Einer erstellt einen Raum und teilt
 | Mitgehen + verlieren | 1 + Stufe Leben |
 | Alle steigen aus | Klopfer gewinnt Runde sofort |
 | Karte eines Aussteigers im laufenden Stich | bleibt liegen, kann nicht gewinnen, Vorhand-Farbe bleibt |
-| Klopf-Limit | keins (Leben können nicht unter 0) |
+| Klopf-Limit | Wer klopft, darf die Stufe höchstens auf die eigenen Leben heben. Blind auf 3 braucht mindestens 3 Leben |
 | Ausspieler neue Runde | Rundengewinner |
 | Austeilphase | 30 s. Karten verdeckt bis "Aufdecken". Buttons: Aufdecken, Blind auf 3 (nur solange nicht aufgedeckt), Einigung (nur 2 Spieler). Start, wenn alle aufgedeckt haben oder der Timer abläuft |
 | Klopf während der Austeilphase | beendet die Austeilphase, nach Auflösung direkt `playing` |
 | Antwort-Timeout Klopf | 30 s. Keine Antwort = Aussteigen (zahlt Stufe). Spieler mit 1 Leben geht automatisch mit |
 | Antwort-Timeout Einigung | 30 s. Keine Antwort = Einigung abgelehnt, zurück in die Austeilphase mit der Restzeit |
 | Zug-Timeout | 60 s, dann spielt der Server eine zufällige gültige Karte |
-| Auto-Klopf | Der erste Spieler mit 1 Leben klopft zu Rundenbeginn automatisch. Spieler mit 1 Leben müssen mitgehen |
+| Auto-Klopf | Fällt ein Spieler auf 1 Leben, klopft er zu Beginn der nächsten Runde automatisch, einmal pro Spiel. Spieler mit 1 Leben müssen immer mitgehen |
 | Blind auf 3 | Klopf direkt auf Stufe 3, nur vor dem Aufdecken |
 | Disconnect in der Lobby | 60 s Frist (Reload überlebt), dann fliegt der Spieler aus dem Raum, sein Token wird ungültig |
 | Host | dynamisch: erster Spieler in Sitzreihenfolge mit `connected=true`. `hostId` geht im GameState an alle |

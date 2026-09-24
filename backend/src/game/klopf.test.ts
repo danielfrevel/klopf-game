@@ -193,3 +193,33 @@ describe('klopf and lives', () => {
     expect(fired).toEqual([]);
   });
 });
+
+describe('klopf limits', () => {
+  test('klopf may not raise the level above the klopfer lives', () => {
+    const game = startedGame(2);
+    player(game, 'A').lives = 2;
+    ok(initiateGameKlopf(game, 'A'));
+    ok(respondToGameKlopf(game, 'B', true));
+    ok(initiateGameKlopf(game, 'B'));
+    ok(respondToGameKlopf(game, 'A', true));
+    expect(initiateGameKlopf(game, 'A')).toBe(GameErrors.KLOPF_LIMIT);
+    expect(game.klopf.level).toBe(2);
+  });
+
+  test('auto-klopf happens only once per player', () => {
+    const game = startedGame(2);
+    player(game, 'B').lives = 2;
+    playRoundAWinsAll(game);
+    expect(player(game, 'B').lives).toBe(1);
+    expect(game.state).toBe('klopf_pending');
+    ok(respondToGameKlopf(game, 'A', true));
+
+    const a = [card('J', 'hearts'), card('Q', 'hearts'), card('K', 'hearts'), card('A', 'hearts')];
+    const b = [card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')];
+    playRound(game, [a, b], [[a[0], b[0]], [b[1], a[1]], [b[2], a[2]], [b[3], a[3]]]);
+    expect(player(game, 'B').lives).toBe(1);
+    expect(game.roundNumber).toBe(3);
+    expect(game.state).toBe('dealing');
+    expect(player(game, 'B').mustMitgehen).toBe(true);
+  });
+});

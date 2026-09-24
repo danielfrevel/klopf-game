@@ -145,3 +145,12 @@ describe('einigung responses', () => {
     expect(levels).toEqual([2]);
   });
 });
+
+describe('blind auf 3 limit', () => {
+  test('blind auf 3 needs at least 3 lives', () => {
+    const game = dealingGame(2);
+    player(game, 'A').lives = 2;
+    expect(blindDrei(game, 'A')).toBe(GameErrors.KLOPF_LIMIT);
+    expect(game.state).toBe('dealing');
+  });
+});

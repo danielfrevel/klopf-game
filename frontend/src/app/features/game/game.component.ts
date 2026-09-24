@@ -113,7 +113,9 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
             @if (!gameState.me()?.revealed && gameState.isActive()) {
               <div class="flex justify-center gap-4 mt-4">
                 <button class="btn btn-primary" (click)="revealCards()">Aufdecken</button>
-                <button class="btn btn-warning" (click)="blindDrei()">Blind auf 3</button>
+                @if ((gameState.me()?.lives ?? 0) >= 3) {
+                  <button class="btn btn-warning" (click)="blindDrei()">Blind auf 3</button>
+                }
               </div>
             }
           </div>
@@ -231,10 +233,9 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
 
       <!-- Round Results -->
       @if (gameState.roundResults()) {
-        <div class="modal modal-open">
-          <div class="modal-box">
-            <h3 class="font-bold text-lg mb-4">Runde beendet</h3>
-            <ul class="space-y-2">
+        <div class="fixed top-4 left-1/2 -translate-x-1/2 z-40 card bg-base-100 shadow-xl border border-base-300 p-4 w-80">
+            <h3 class="font-bold mb-2">Runde beendet</h3>
+            <ul class="space-y-1 text-sm">
               @for (result of gameState.roundResults(); track result.playerId) {
                 <li class="flex justify-between items-center p-2 rounded"
                     [class.bg-error/20]="result.isLoser">
@@ -250,11 +251,7 @@ import { KlopfDialogComponent } from '../../shared/components/klopf-dialog/klopf
                 </li>
               }
             </ul>
-            <div class="modal-action">
-              <button class="btn btn-primary" (click)="continueGame()">Weiter</button>
-            </div>
-          </div>
-          <div class="modal-backdrop bg-black/50"></div>
+            <button class="btn btn-ghost btn-xs mt-2 self-end" (click)="continueGame()">Schließen</button>
         </div>
       }
 
@@ -307,7 +304,10 @@ export class GameComponent implements OnInit, OnDestroy {
   canKlopf(): boolean {
     const state = this.gameState.gameState();
     if (!state || (state.state !== 'playing' && state.state !== 'dealing')) return false;
-    return this.gameState.isActive() && state.klopf.lastKlopper !== this.gameState.playerId();
+    const lives = this.gameState.me()?.lives ?? 0;
+    return this.gameState.isActive()
+      && state.klopf.lastKlopper !== this.gameState.playerId()
+      && state.klopf.level + 1 <= lives;
   }
 
   revealCards(): void {

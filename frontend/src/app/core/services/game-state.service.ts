@@ -7,11 +7,14 @@ import { LoggerService } from './logger.service';
 import { SessionService } from './session.service';
 import { errorText } from './error-text';
 
+const ROUND_RESULTS_MS = 8000;
+
 @Injectable({
   providedIn: 'root'
 })
 export class GameStateService {
   private logger = inject(LoggerService);
+  private roundResultsTimer?: ReturnType<typeof setTimeout>;
   private session = inject(SessionService);
 
   // Signals for reactive state
@@ -179,6 +182,8 @@ export class GameStateService {
       case 'round_ended':
         if (msg.results) {
           this._roundResults.set(msg.results);
+          clearTimeout(this.roundResultsTimer);
+          this.roundResultsTimer = setTimeout(() => this._roundResults.set(null), ROUND_RESULTS_MS);
           this.logger.info('GameState', 'Round ended', { results: msg.results });
         }
         break;

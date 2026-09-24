@@ -7,6 +7,7 @@ const ERROR_TEXT: Record<string, string> = {
   'Room not found': 'Diesen Raum gibt es nicht mehr.',
   'Name must be 1 to 20 characters': 'Der Name muss 1 bis 20 Zeichen lang sein.',
   'Player is not active in this round': 'Du bist in dieser Runde ausgestiegen.',
+  'Klopf level may not exceed own lives': 'Du kannst nicht höher klopfen, als du Leben hast.',
 };
 
 export function errorText(error: string): string {

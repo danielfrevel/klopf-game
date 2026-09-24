@@ -11,6 +11,7 @@ export interface PlayerState {
   folded: boolean;
   revealed: boolean;
   roundLivesLost: number;
+  autoKlopfDone: boolean;
 }
 
 export interface TrickState {

@@ -51,7 +51,7 @@ Zustand eines Spielers für den Rest der Runde nach dem Aussteigen. Code `folded
 Spieler, der lebt und in dieser Runde nicht ausgestiegen ist. Nur aktive Spieler legen Karten und antworten auf Klopfs. Code `active`.
 
 **Auto-Klopf**:
-Pflichtklopf zu Rundenbeginn durch den ersten Spieler mit 1 Leben. Code `autoKlopf`.
+Pflichtklopf zu Rundenbeginn durch einen Spieler, der auf 1 Leben gefallen ist. Einmal pro Spiel und Spieler. Code `autoKlopf`, `autoKlopfDone`.
 
 **Mitgeh-Pflicht**:
 Spieler mit 1 Leben kann nicht aussteigen. Code `mustMitgehen`.

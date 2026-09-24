@@ -31,6 +31,7 @@ export const GameErrors = {
   PLAYER_NOT_ACTIVE: 'Player is not active in this round',
   OWN_KLOPF: 'Cannot respond to own klopf',
   OWN_REDEAL: 'Cannot respond to own redeal request',
+  KLOPF_LIMIT: 'Klopf level may not exceed own lives',
   ALREADY_REVEALED: 'Cards already revealed',
   REDEAL_LIMIT_REACHED: 'Redeal limit reached',
   REDEAL_NOT_ALLOWED: 'Redeal only allowed with 2 players',
@@ -131,7 +132,7 @@ function resetPlayerForRound(player: PlayerState): void {
 }
 
 function tryAutoKlopf(game: GameData): boolean {
-  const player = game.players.find((p) => isAlive(p) && p.lives === 1);
+  const player = game.players.find((p) => isAlive(p) && p.lives === 1 && !p.autoKlopfDone);
   if (!player) return false;
 
   const err = initiateKlopf(game.klopf, player.id);
@@ -139,6 +140,7 @@ function tryAutoKlopf(game: GameData): boolean {
     log.klopf.error(`Auto-klopf for ${player.name} failed: ${err}`);
     return false;
   }
+  player.autoKlopfDone = true;
   game.state = 'klopf_pending';
   startResponseTimer(game);
   return true;
@@ -194,6 +196,7 @@ export function blindDrei(game: GameData, playerId: string): string | null {
   if (!player) return GameErrors.PLAYER_NOT_FOUND;
   if (!isActive(player)) return GameErrors.PLAYER_NOT_ACTIVE;
   if (player.revealed) return GameErrors.ALREADY_REVEALED;
+  if (player.lives < 3) return GameErrors.KLOPF_LIMIT;
 
   const previousLevel = game.klopf.level;
   game.klopf.level = 2;
@@ -214,6 +217,7 @@ export function initiateGameKlopf(game: GameData, playerId: string): string | nu
   const player = getPlayer(game, playerId);
   if (!player) return GameErrors.PLAYER_NOT_FOUND;
   if (!isActive(player)) return GameErrors.PLAYER_NOT_ACTIVE;
+  if (game.klopf.level + 1 > player.lives) return GameErrors.KLOPF_LIMIT;
 
   const err = initiateKlopf(game.klopf, playerId);
   if (err) return err;
@@ -402,6 +406,7 @@ export function restartGame(game: GameData): string | null {
   for (const player of players) {
     resetPlayerForRound(player);
     player.lives = INITIAL_LIVES;
+    player.autoKlopfDone = false;
   }
   const { stakes, onTimeout, onPhaseExpired } = game;
   Object.assign(game, createGame(game.timeouts), { players, stakes, onTimeout, onPhaseExpired });
